@@ -18,7 +18,7 @@
  *   VITE_API_URL=http://localhost:5000/api
  */
 
-import { useState, useEffect, useCallback, useContext, createContext } from "react";
+import { useState, useEffect, useCallback, useContext, createContext, useRef } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ApiClient  —  src/api/client.js
@@ -128,6 +128,21 @@ const ApiClient = {
       apiFetch("/rankings/overall"),
   },
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Geocoding  —  Nominatim (OpenStreetMap, gratuit, sans clé)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function geocodeAddress(address) {
+  if (!address?.trim()) return null;
+  try {
+    const q   = encodeURIComponent(`${address.trim()}, Montréal, Canada`);
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`);
+    const data = await res.json();
+    if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  } catch {}
+  return null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  AppContext  —  store/AppContext.jsx
@@ -344,8 +359,9 @@ function useBakeries() {
 
   const addBakery = useCallback(async (payload) => {
     if (!isAdmin && !user) { notify("Connectez-vous pour ajouter une boulangerie", "error"); return null; }
+    const coords = payload.address ? (await geocodeAddress(payload.address)) ?? {} : {};
     try {
-      const b = await ApiClient.bakeries.create(payload, isAdmin ? adminPin : null, user?.token);
+      const b = await ApiClient.bakeries.create({ ...payload, ...coords }, isAdmin ? adminPin : null, user?.token);
       await refresh();
       notify("Boulangerie ajoutée !");
       return b;
@@ -797,14 +813,37 @@ function RankingsView() {
 }
 
 function AddBakeryModal({ onClose, onSave }) {
-  const [f, setF] = useState({ name: "", neighborhood: "", address: "" });
-  const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
+  const [f, setF]     = useState({ name: "", neighborhood: "", address: "" });
+  const [errors, setErrors] = useState({});
+  const set = (k) => (e) => { setF((p) => ({ ...p, [k]: e.target.value })); setErrors((p) => ({ ...p, [k]: false })); };
+
+  const handleSubmit = () => {
+    const errs = {};
+    if (!f.name.trim())         errs.name         = true;
+    if (!f.neighborhood.trim()) errs.neighborhood  = true;
+    if (!f.address.trim())      errs.address       = true;
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    onSave(f);
+  };
+
+  const inputStyle = (k) => ({ ...css.input, borderColor: errors[k] ? T.danger : undefined });
+
   return (
     <Modal title="Ajouter une boulangerie" onClose={onClose}>
-      <Field label="Nom *"><input value={f.name} onChange={set("name")} placeholder="Ex : Première Moisson" style={css.input} /></Field>
-      <Field label="Quartier"><input value={f.neighborhood} onChange={set("neighborhood")} placeholder="Ex : Plateau-Mont-Royal" style={css.input} /></Field>
-      <Field label="Adresse"><input value={f.address} onChange={set("address")} placeholder="Ex : 1234 rue Saint-Denis" style={css.input} /></Field>
-      <button onClick={() => onSave(f)} style={{ ...css.btnGold, marginTop: 8 }}>Ajouter</button>
+      <Field label="Nom *">
+        <input value={f.name} onChange={set("name")} placeholder="Ex : Première Moisson" style={inputStyle("name")} />
+        {errors.name && <p style={{ color: T.danger, fontSize: 12, marginTop: 4 }}>Champ requis</p>}
+      </Field>
+      <Field label="Quartier *">
+        <input value={f.neighborhood} onChange={set("neighborhood")} placeholder="Ex : Plateau-Mont-Royal" style={inputStyle("neighborhood")} />
+        {errors.neighborhood && <p style={{ color: T.danger, fontSize: 12, marginTop: 4 }}>Champ requis</p>}
+      </Field>
+      <Field label="Adresse *">
+        <input value={f.address} onChange={set("address")} placeholder="Ex : 1234 rue Saint-Denis" style={inputStyle("address")} />
+        {errors.address && <p style={{ color: T.danger, fontSize: 12, marginTop: 4 }}>Champ requis</p>}
+      </Field>
+      <p style={{ fontSize: 12, color: T.muted, fontStyle: "italic", marginBottom: 12 }}>📍 L'adresse sera géolocalisée automatiquement pour la carte.</p>
+      <button onClick={handleSubmit} style={{ ...css.btnGold, marginTop: 4 }}>Ajouter</button>
     </Modal>
   );
 }
@@ -1250,6 +1289,108 @@ function HomeView({ onNavigate, onShowAuth }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  views/MapView
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MapView() {
+  const { bakeries }                                        = useApp();
+  const { overallRanking, fetchOverallRanking }             = useRankings();
+  const mapRef         = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markersRef     = useRef([]);
+
+  useEffect(() => { fetchOverallRanking(); }, []);
+
+  // Init carte
+  useEffect(() => {
+    if (!mapRef.current || mapInstanceRef.current) return;
+    const L = window.L;
+    if (!L) return;
+
+    mapInstanceRef.current = L.map(mapRef.current).setView([45.5088, -73.5878], 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(mapInstanceRef.current);
+
+    return () => {
+      mapInstanceRef.current?.remove();
+      mapInstanceRef.current = null;
+    };
+  }, []);
+
+  // Marqueurs
+  useEffect(() => {
+    const L = window.L;
+    if (!L || !mapInstanceRef.current) return;
+
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    const rankMap = Object.fromEntries(overallRanking.map((r) => [r.bakery.id, r]));
+
+    bakeries.forEach((b) => {
+      if (!b.lat || !b.lng) return;
+      const r     = rankMap[b.id];
+      const score = r?.overall_average?.toFixed(1);
+
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="width:42px;height:42px;background:${T.dark};border:2.5px solid ${T.gold};border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.45)"><span style="transform:rotate(45deg);color:${T.gold};font-weight:700;font-size:12px;font-family:Georgia,serif;line-height:1">${score ?? "🥖"}</span></div>`,
+        iconSize: [42, 42],
+        iconAnchor: [21, 42],
+        popupAnchor: [0, -46],
+      });
+
+      const prods = r?.product_averages
+        ?.sort((a, b2) => b2.average - a.average)
+        ?.slice(0, 4)
+        ?.map((p) => `<span style="background:#FAF3E4;padding:3px 9px;border-radius:12px;font-size:11px;margin:2px;display:inline-block;border:1px solid #E8D5B5">${p.product_type.emoji} ${p.product_type.name} <b style="color:#C8912A">${p.average.toFixed(1)}</b></span>`)
+        ?.join("") ?? "";
+
+      const popup = `
+        <div style="font-family:Georgia,serif;min-width:190px;padding:2px 4px">
+          <div style="font-size:16px;font-weight:700;color:#2C1810;margin-bottom:2px">${b.name}</div>
+          ${b.neighborhood ? `<div style="font-size:12px;color:#8B6550;margin-bottom:8px">${b.neighborhood}</div>` : ""}
+          ${score
+            ? `<div style="font-size:26px;font-weight:700;color:#C8912A;line-height:1;margin-bottom:8px;font-family:'Playfair Display',Georgia,serif">${score}<span style="font-size:12px;color:#8B6550;font-weight:400"> / 5 · ${r.total_ratings} avis</span></div>`
+            : `<div style="font-size:12px;color:#8B6550;margin-bottom:8px">${b.rating_count} avis</div>`
+          }
+          ${prods ? `<div style="line-height:2;margin-bottom:6px">${prods}</div>` : ""}
+          ${b.address ? `<div style="font-size:11px;color:#8B6550;border-top:1px solid #E8D5B5;padding-top:6px;margin-top:4px">📍 ${b.address}</div>` : ""}
+        </div>`;
+
+      markersRef.current.push(
+        L.marker([b.lat, b.lng], { icon })
+          .addTo(mapInstanceRef.current)
+          .bindPopup(popup, { maxWidth: 300 })
+      );
+    });
+  }, [bakeries, overallRanking]);
+
+  const withCoords    = bakeries.filter((b) => b.lat && b.lng);
+  const withoutCoords = bakeries.filter((b) => !b.lat || !b.lng);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 20 }}>
+        <div>
+          <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 26, color: T.dark }}>Carte des boulangeries</h2>
+          <p style={{ color: T.muted, fontSize: 14, marginTop: 4, fontStyle: "italic" }}>{withCoords.length} boulangerie{withCoords.length !== 1 ? "s" : ""} sur la carte · Cliquez sur un marqueur pour le détail</p>
+        </div>
+      </div>
+
+      <div ref={mapRef} style={{ height: 560, borderRadius: 16, overflow: "hidden", border: `2px solid ${T.border}`, boxShadow: "0 4px 24px rgba(0,0,0,0.09)", marginBottom: 16 }} />
+
+      {withoutCoords.length > 0 && (
+        <div style={{ padding: "12px 18px", background: `${T.gold}11`, border: `1px solid ${T.gold}33`, borderRadius: 10, fontSize: 13, color: T.muted }}>
+          ⚠️ {withoutCoords.length} boulangerie{withoutCoords.length > 1 ? "s" : ""} sans coordonnées ({withoutCoords.map((b) => b.name).join(", ")}) — assurez-vous d'entrer une adresse précise lors de l'ajout.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  AuthModal  —  connexion / inscription
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1303,6 +1444,7 @@ const VIEWS = [
   { id: "home",     icon: "🏠", label: "Accueil" },
   { id: "rankings", icon: "🏆", label: "Classements" },
   { id: "bakeries", icon: "🏪", label: "Boulangeries" },
+  { id: "map",      icon: "🗺️", label: "Carte" },
 ];
 
 function Shell() {
@@ -1367,6 +1509,7 @@ function Shell() {
           <div style={{ padding: "32px", maxWidth: 1080, margin: "0 auto" }}>
             {view === "rankings" && <RankingsView />}
             {view === "bakeries" && <BakeriesView />}
+            {view === "map"      && <MapView />}
           </div>
         )}
       </main>

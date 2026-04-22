@@ -44,14 +44,20 @@ def create_bakery():
     name         = str(body.get("name", "")).strip()
     neighborhood = str(body.get("neighborhood", "")).strip()
     address      = str(body.get("address", "")).strip()
+    lat          = body.get("lat")
+    lng          = body.get("lng")
 
     if not name:
         return error("Le champ 'name' est requis", "MISSING_NAME", 400)
+    if not neighborhood:
+        return error("Le champ 'neighborhood' est requis", "MISSING_NEIGHBORHOOD", 400)
+    if not address:
+        return error("Le champ 'address' est requis", "MISSING_ADDRESS", 400)
 
     db     = get_db()
     bakery = BakeryRepository(db).create(
         name=name, neighborhood=neighborhood, address=address,
-        created_by=g.user_id,
+        created_by=g.user_id, lat=lat, lng=lng,
     )
     return success(bakery, "Boulangerie créée", 201)
 

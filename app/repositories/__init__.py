@@ -139,12 +139,12 @@ class BakeryRepository:
         )
         return result.data
 
-    def create(self, name: str, neighborhood: str, address: str, created_by: str | None = None) -> dict:
-        result = (
-            self.db.table("bakeries")
-            .insert({"name": name, "neighborhood": neighborhood, "address": address, "created_by": created_by})
-            .execute()
-        )
+    def create(self, name: str, neighborhood: str, address: str,
+               created_by: str | None = None, lat: float | None = None, lng: float | None = None) -> dict:
+        row = {"name": name, "neighborhood": neighborhood, "address": address, "created_by": created_by}
+        if lat is not None: row["lat"] = lat
+        if lng is not None: row["lng"] = lng
+        result = self.db.table("bakeries").insert(row).execute()
         return result.data[0]
 
     def delete(self, bakery_id: str) -> None:
