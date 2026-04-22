@@ -587,7 +587,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }) {
 
 function Toast({ msg, type }) {
   return (
-    <div style={{ position: "fixed", top: 82, right: 20, zIndex: 400, background: type === "success" ? T.success : T.danger, color: "#FAF3E4", padding: "12px 20px", borderRadius: 10, fontSize: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.25)" }}>
+    <div style={{ position: "fixed", top: 88, right: 20, zIndex: 400, background: type === "success" ? T.success : T.danger, color: "#FAF3E4", padding: "12px 20px", borderRadius: 10, fontSize: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.25)" }}>
       {msg}
     </div>
   );
@@ -1416,194 +1416,186 @@ function Footer() {
 
 function HomeView({ onNavigate, onShowAuth }) {
   const { bakeries, productTypes, user, isMobile } = useApp();
-  const {
-    overallRanking, loadingOverall, fetchOverallRanking,
-    productRanking, loadingProduct, fetchProductRanking,
-  } = useRankings();
-  const [activePt, setActivePt] = useState(null);
-  const medals = ["🥇", "🥈", "🥉"];
+  const { overallRanking, fetchOverallRanking } = useRankings();
+  const [allRankings, setAllRankings] = useState({});
 
   useEffect(() => { fetchOverallRanking(); }, []);
 
   useEffect(() => {
-    if (productTypes.length > 0 && !activePt) {
-      const first = productTypes[0].id;
-      setActivePt(first);
-      fetchProductRanking(first);
-    }
+    if (productTypes.length === 0) return;
+    productTypes.forEach(async (pt) => {
+      try {
+        const data = await ApiClient.rankings.byProduct(pt.id);
+        setAllRankings(prev => ({ ...prev, [pt.id]: data }));
+      } catch {}
+    });
   }, [productTypes]);
 
-  const handlePtChange = (id) => { setActivePt(id); fetchProductRanking(id); };
-  const top3     = overallRanking.slice(0, 3);
-  const totalAvis = overallRanking.reduce((a, b) => a + b.total_ratings, 0);
+  const top3 = overallRanking.slice(0, 3);
 
   return (
-    <div>
-      {/* ── Hero plein écran ── */}
-      <div style={{ background: `linear-gradient(135deg, ${T.dark}, #4A2A18)`, overflow: "hidden", position: "relative" }}>
-        <div style={{ position: "absolute", right: -60, top: -60, width: 300, height: 300, borderRadius: "50%", border: `1px solid ${T.gold}22`, pointerEvents: "none" }} />
-        <div style={{ position: "absolute", right: -30, top: -30, width: 200, height: 200, borderRadius: "50%", border: `1px solid ${T.gold}15`, pointerEvents: "none" }} />
-        <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "40px 20px" : "64px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, flexWrap: "wrap" }}>
+    <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "20px 16px 48px" : "32px 32px 72px" }}>
+
+      {/* ── Hero card ── */}
+      <div style={{ background: `linear-gradient(135deg, ${T.dark} 0%, #4A2A18 100%)`, borderRadius: 20, overflow: "hidden", position: "relative", marginBottom: isMobile ? 32 : 48, padding: isMobile ? "32px 24px" : "48px 48px" }}>
+        <div style={{ position: "absolute", right: -60, top: -60, width: 320, height: 320, borderRadius: "50%", border: `1px solid ${T.gold}18`, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", right: 20, top: 20, width: 200, height: 200, borderRadius: "50%", border: `1px solid ${T.gold}10`, pointerEvents: "none" }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 32, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
           {/* Colonne texte */}
-          <div style={{ flex: "1 1 280px" }}>
-            <div style={{ fontSize: 11, color: T.gold, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 12 }}>
+          <div style={{ flex: "1 1 260px" }}>
+            <div style={{ fontSize: 11, color: T.gold, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 14 }}>
               Montréal · Guide artisanal
             </div>
-            <h1 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? "clamp(30px, 8vw, 38px)" : "clamp(32px, 4vw, 48px)", fontWeight: 900, color: "#FAF3E4", lineHeight: 1.15, marginBottom: 14 }}>
+            <h1 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? "clamp(28px, 8vw, 36px)" : "clamp(28px, 3.2vw, 42px)", fontWeight: 900, color: "#FAF3E4", lineHeight: 1.18, marginBottom: 16 }}>
               Les meilleures<br />boulangeries<br /><span style={{ color: T.gold }}>de Montréal</span>
             </h1>
-            <p style={{ fontSize: isMobile ? 14 : 15, color: "#FAF3E4BB", lineHeight: 1.6, marginBottom: 28, maxWidth: 420 }}>
-              Découvrez, évaluez et partagez vos coups de cœur parmi les artisans boulangers de la métropole.
+            <p style={{ fontSize: isMobile ? 13 : 14, color: "#FAF3E4AA", lineHeight: 1.65, marginBottom: 28, maxWidth: 360 }}>
+              Notez et découvrez les artisans boulangers de votre quartier — baguettes, croissants, pains de campagne et bien plus.
             </p>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button onClick={() => onNavigate("bakeries")}
-                style={{ ...css.btnGold, width: "auto", padding: isMobile ? "11px 20px" : "12px 28px", fontSize: isMobile ? 14 : 15 }}>
+                style={{ ...css.btnGold, width: "auto", padding: isMobile ? "10px 18px" : "11px 24px", fontSize: isMobile ? 13 : 14 }}>
                 🏪 Explorer les boulangeries
               </button>
               <button onClick={() => onNavigate("rankings")}
-                style={{ background: "#ffffff15", border: "1px solid #ffffff30", color: "#FAF3E4", padding: isMobile ? "11px 16px" : "12px 24px", borderRadius: 10, fontSize: isMobile ? 14 : 15, cursor: "pointer", fontFamily: "inherit" }}>
-                🏆 Classements
+                style={{ background: "#ffffff12", border: "1px solid #ffffff28", color: "#FAF3E4", padding: isMobile ? "10px 14px" : "11px 20px", borderRadius: 10, fontSize: isMobile ? 13 : 14, cursor: "pointer", fontFamily: "inherit" }}>
+                🏆 Voir les classements
               </button>
             </div>
           </div>
 
           {/* Mini podium top 3 — desktop uniquement */}
           {!isMobile && top3.length > 0 && (
-            <div style={{ flex: "0 1 280px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {top3.map(({ bakery, overall_average, total_ratings }, i) => (
-                <div key={bakery.id} onClick={() => onNavigate("rankings")}
-                  style={{ background: i === 0 ? `${T.gold}22` : "#ffffff0a", border: `1px solid ${i === 0 ? T.gold + "55" : "#ffffff15"}`, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
-                  <span style={{ fontSize: i === 0 ? 24 : 20 }}>{medals[i]}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: '"Playfair Display", serif', fontSize: i === 0 ? 15 : 13, fontWeight: 700, color: "#FAF3E4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{bakery.name}</div>
-                    <div style={{ fontSize: 11, color: "#FAF3E460", marginTop: 1 }}>{bakery.neighborhood} · {total_ratings} avis</div>
+            <div style={{ flex: "0 1 260px", display: "flex", flexDirection: "column", gap: 8 }}>
+              {top3.map(({ bakery, overall_average, total_ratings }, i) => {
+                const medalBg = ["#C8912A", "#7A8FA6", "#9E6B4A"];
+                return (
+                  <div key={bakery.id} onClick={() => onNavigate("rankings")}
+                    style={{ background: "#ffffff09", border: "1px solid #ffffff14", borderRadius: 12, padding: "11px 14px", display: "flex", alignItems: "center", gap: 11, cursor: "pointer" }}>
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: medalBg[i], display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "white", lineHeight: 1 }}>{i + 1}</span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 14, fontWeight: 700, color: "#FAF3E4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{bakery.name}</div>
+                      <div style={{ fontSize: 11, color: "#FAF3E450", marginTop: 1 }}>{bakery.neighborhood} · {total_ratings} avis</div>
+                    </div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1, flexShrink: 0 }}>{overall_average.toFixed(1)}</div>
                   </div>
-                  <div style={{ fontSize: i === 0 ? 22 : 18, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>{overall_average.toFixed(1)}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Stats plein écran ── */}
-      <div style={{ background: `linear-gradient(135deg, ${T.gold}, #E8B84B)`, boxShadow: "0 4px 16px rgba(200,145,42,0.25)" }}>
-        <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "16px 20px" : "20px 40px", display: "flex", justifyContent: "center", gap: "clamp(20px, 6vw, 72px)", flexWrap: "wrap" }}>
-          {[
-            ["🏪", bakeries.length,     "boulangeries"],
-            ["🥖", productTypes.length, "produits notés"],
-            ["⭐", totalAvis || "—",    "avis déposés"],
-          ].map(([icon, num, label]) => (
-            <div key={label} style={{ textAlign: "center", color: "white" }}>
-              <div style={{ fontSize: isMobile ? 18 : 22 }}>{icon}</div>
-              <div style={{ fontSize: isMobile ? 22 : 30, fontWeight: 700, fontFamily: '"Playfair Display", serif', lineHeight: 1.1 }}>{num}</div>
-              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* ── Sections ── */}
-      <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "28px 16px 48px" : "56px 32px 72px" }}>
+      <div>
 
-        {/* ── Top boulangeries ─────────────────────────── */}
-        {!loadingOverall && top3.length > 0 && (
+        {/* ── Top par produit ───────────────────────────── */}
+        {productTypes.length > 0 && (
           <section style={{ marginBottom: isMobile ? 40 : 64 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
               <div>
-                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 22 : 28, color: T.dark }}>🏆 Meilleures boulangeries</h2>
-                {!isMobile && <p style={{ color: T.muted, fontSize: 14, marginTop: 4, fontStyle: "italic" }}>Classées sur la moyenne de tous les produits évalués</p>}
+                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 22 : 28, color: T.dark }}>Top par produit</h2>
+                {!isMobile && <p style={{ color: T.muted, fontSize: 14, marginTop: 4, fontStyle: "italic" }}>Le meilleur de chaque catégorie selon les avis</p>}
               </div>
               <button onClick={() => onNavigate("rankings")} style={{ background: "none", border: "none", color: T.gold, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>
-                Classement complet →
+                Voir les classements →
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
-              {top3.map(({ bakery, overall_average, total_ratings, product_averages }, i) => (
-                <div key={bakery.id} onClick={() => onNavigate("bakeries")}
-                  style={{ background: i === 0 ? `linear-gradient(140deg, ${T.dark} 0%, #4A2A18 100%)` : "white", color: i === 0 ? "#FAF3E4" : T.dark, borderRadius: 18, padding: isMobile ? "20px 18px" : "26px 24px", border: `2px solid ${i === 0 ? T.gold : T.border}`, cursor: "pointer", boxShadow: i === 0 ? `0 8px 32px ${T.gold}33` : "0 2px 12px rgba(0,0,0,0.06)", transition: "transform 0.18s" }}
-                  onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-3px)"}
-                  onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>{medals[i]}</div>
-                  <div style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 17 : 20, fontWeight: 700, marginBottom: 3 }}>{bakery.name}</div>
-                  {bakery.neighborhood && <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 12 }}>{bakery.neighborhood}</div>}
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                    <span style={{ fontSize: isMobile ? 30 : 36, fontWeight: 700, color: T.gold, lineHeight: 1, fontFamily: '"Playfair Display", serif' }}>{overall_average.toFixed(1)}</span>
-                    <div>
-                      <div style={{ display: "flex", gap: 2 }}>
-                        {[1,2,3,4,5].map(s => <span key={s} style={{ color: s <= Math.round(overall_average) ? T.gold : (i === 0 ? "#FFFFFF25" : T.border), fontSize: 14 }}>★</span>)}
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(268px, 1fr))", gap: 16 }}>
+              {productTypes.map(pt => {
+                const ranking = allRankings[pt.id] || [];
+                const winner = ranking[0];
+                return (
+                  <div key={pt.id} onClick={() => onNavigate("rankings")}
+                    style={{ background: "white", borderRadius: 16, overflow: "hidden", border: `1px solid ${T.border}`, cursor: "pointer", boxShadow: "0 2px 10px rgba(44,24,16,0.06)", transition: "transform 0.18s, box-shadow 0.18s" }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(44,24,16,0.12)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 10px rgba(44,24,16,0.06)"; }}>
+                    <div style={{ background: T.dark, padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 22 }}>{pt.emoji}</span>
+                        <span style={{ fontFamily: '"Playfair Display", serif', fontSize: 15, fontWeight: 700, color: "#FAF3E4" }}>{pt.name}</span>
                       </div>
-                      <div style={{ fontSize: 12, opacity: 0.55, marginTop: 2 }}>{total_ratings} avis</div>
+                      {ranking.length > 0 && <span style={{ fontSize: 11, color: `${T.gold}CC`, fontWeight: 600, letterSpacing: "0.05em" }}>{ranking.length} BOUL.</span>}
+                    </div>
+                    <div style={{ padding: "16px 18px 18px" }}>
+                      {!winner ? (
+                        <div style={{ color: T.muted, fontSize: 13, fontStyle: "italic", textAlign: "center", padding: "12px 0" }}>Aucun avis encore</div>
+                      ) : (
+                        <>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                            <span style={{ fontSize: 20 }}>🥇</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 15, fontWeight: 700, color: T.dark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{winner.bakery.name}</div>
+                              {winner.bakery.neighborhood && <div style={{ fontSize: 11, color: T.muted, marginTop: 1 }}>{winner.bakery.neighborhood}</div>}
+                            </div>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1, flexShrink: 0 }}>{winner.overall_average.toFixed(1)}</div>
+                          </div>
+                          {winner.aggregated_scores && winner.aggregated_scores.slice(0, 2).map(({ criterion_name, average }) => (
+                            <div key={criterion_name} style={{ marginBottom: 7 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                                <span style={{ fontSize: 11, color: T.muted, textTransform: "capitalize" }}>{criterion_name}</span>
+                                <span style={{ fontSize: 11, color: T.gold, fontWeight: 600 }}>{average.toFixed(1)}</span>
+                              </div>
+                              <div style={{ height: 4, background: T.border, borderRadius: 3, overflow: "hidden" }}>
+                                <div style={{ height: "100%", width: `${(average / 5) * 100}%`, background: `linear-gradient(90deg, ${T.gold}, #E8B84B)`, borderRadius: 3 }} />
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {product_averages.slice(0, 3).map(({ product_type, average }) => (
-                      <span key={product_type.id} style={{ background: i === 0 ? "#FFFFFF14" : T.bg, padding: "3px 10px", borderRadius: 20, fontSize: 12, border: `1px solid ${i === 0 ? "#FFFFFF18" : T.border}` }}>
-                        {product_type.emoji} {average.toFixed(1)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
 
-        {/* ── Par produit ───────────────────────────────── */}
-        {productTypes.length > 0 && (
+        {/* ── Boulangeries ──────────────────────────────── */}
+        {bakeries.length > 0 && (
           <section style={{ marginBottom: isMobile ? 40 : 64 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
               <div>
-                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 22 : 28, color: T.dark }}>Explorer par produit</h2>
-                {!isMobile && <p style={{ color: T.muted, fontSize: 14, marginTop: 4, fontStyle: "italic" }}>Qui fait le meilleur croissant ? La meilleure baguette ?</p>}
+                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 22 : 28, color: T.dark }}>🏪 Boulangeries</h2>
+                {!isMobile && <p style={{ color: T.muted, fontSize: 14, marginTop: 4, fontStyle: "italic" }}>Toutes les boulangeries artisanales recensées</p>}
               </div>
-              <button onClick={() => onNavigate("rankings")} style={{ background: "none", border: "none", color: T.gold, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>
-                Voir tout →
+              <button onClick={() => onNavigate("bakeries")} style={{ background: "none", border: "none", color: T.gold, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>
+                Voir toutes →
               </button>
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-              {productTypes.map(pt => (
-                <button key={pt.id} onClick={() => handlePtChange(pt.id)}
-                  style={{ padding: isMobile ? "8px 16px" : "10px 22px", border: `2px solid ${activePt === pt.id ? T.gold : T.border}`, background: activePt === pt.id ? T.gold : "white", color: activePt === pt.id ? "white" : T.muted, borderRadius: 30, fontSize: isMobile ? 13 : 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", fontWeight: activePt === pt.id ? 600 : 400 }}>
-                  {pt.emoji} {pt.name}
-                </button>
-              ))}
-            </div>
-            {loadingProduct ? <Spinner /> : productRanking.length === 0 ? (
-              <EmptyState text="Aucun avis pour ce produit encore." />
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {productRanking.slice(0, 5).map(({ bakery, overall_average, rating_count }, i) => (
-                  <div key={bakery.id} style={{ background: "white", borderRadius: 14, padding: "14px 18px", border: `1px solid ${i === 0 ? T.gold : T.border}`, display: "flex", alignItems: "center", gap: 14, boxShadow: i === 0 ? `0 2px 12px ${T.gold}22` : "none" }}>
-                    <div style={{ fontSize: 20, minWidth: 30, textAlign: "center" }}>{medals[i] ?? `#${i+1}`}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 15 : 17, color: T.dark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{bakery.name}</div>
-                      {bakery.neighborhood && <div style={{ fontSize: 12, color: T.muted }}>{bakery.neighborhood}</div>}
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: isMobile ? 22 : 26, fontWeight: 700, color: T.gold, lineHeight: 1, fontFamily: '"Playfair Display", serif' }}>{overall_average.toFixed(1)}</div>
-                      <div style={{ fontSize: 11, color: T.muted }}>{rating_count} avis</div>
-                    </div>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+              {bakeries.slice(0, isMobile ? 4 : 8).map(bakery => {
+                const rank = overallRanking.find(r => r.bakery.id === bakery.id);
+                return (
+                  <div key={bakery.id} onClick={() => onNavigate("bakeries")}
+                    style={{ background: "white", border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 18px", cursor: "pointer", transition: "border-color 0.18s, box-shadow 0.18s" }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = T.gold; e.currentTarget.style.boxShadow = `0 4px 14px ${T.gold}1A`; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.boxShadow = "none"; }}>
+                    <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 15, fontWeight: 700, color: T.dark, marginBottom: 4 }}>{bakery.name}</div>
+                    {bakery.neighborhood && <div style={{ fontSize: 12, color: T.muted, marginBottom: 4 }}>{bakery.neighborhood}</div>}
+                    <div style={{ fontSize: 12, color: T.muted }}>{rank ? `${rank.total_ratings} avis` : "0 avis"}</div>
                   </div>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
           </section>
         )}
 
-        {/* ── CTA inscription ───────────────────────────── */}
+        {/* ── CTA Partagez votre expertise ──────────────── */}
         {!user && (
-          <section style={{ background: `linear-gradient(135deg, ${T.dark} 0%, #4A2A18 100%)`, borderRadius: 20, padding: isMobile ? "36px 24px" : "48px 40px", textAlign: "center", color: "#FAF3E4", position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", right: -20, top: -20, fontSize: 120, opacity: 0.05 }}>✍️</div>
-            <div style={{ position: "relative", zIndex: 1 }}>
-              <div style={{ fontSize: isMobile ? 36 : 44, marginBottom: 12 }}>✍️</div>
-              <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 20 : 26, marginBottom: 10 }}>Vous avez un avis à partager ?</h3>
-              <p style={{ color: `${T.gold}BB`, marginBottom: 24, fontStyle: "italic", lineHeight: 1.6, fontSize: isMobile ? 14 : 15 }}>
-                Créez un compte gratuit pour noter les boulangeries<br />et contribuer au guide.
-              </p>
+          <section>
+            <div style={{ background: "white", border: `1px solid ${T.border}`, borderRadius: 16, padding: isMobile ? "24px 20px" : "28px 36px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
+              <div>
+                <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 18 : 22, color: T.dark, marginBottom: 6 }}>✍️ Partagez votre expertise</h3>
+                <p style={{ color: T.muted, fontSize: isMobile ? 13 : 14, lineHeight: 1.55, maxWidth: 480 }}>
+                  Créez un compte gratuit pour noter les boulangeries et contribuer au guide artisanal de Montréal.
+                </p>
+              </div>
               <button onClick={onShowAuth}
-                style={{ background: T.gold, color: "white", border: "none", padding: "13px 28px", borderRadius: 10, fontSize: 15, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, boxShadow: `0 4px 20px ${T.gold}44` }}>
-                Créer un compte gratuit
+                style={{ ...css.btnGold, width: "auto", padding: "12px 28px", flexShrink: 0 }}>
+                Créer un compte
               </button>
             </div>
           </section>
@@ -1785,7 +1777,7 @@ function Shell() {
     </div>
   );
 
-  const adminBtnBottom = isMobile ? 70 : 20;
+  const adminBtnBottom = isMobile ? 78 : 20;
 
   return (
     <div style={{ fontFamily: '"EB Garamond", Georgia, serif', background: T.bg, minHeight: "100vh", color: T.dark }}>
@@ -1799,62 +1791,54 @@ function Shell() {
       `}</style>
 
       {/* ── Header ── */}
-      <header style={{ background: T.bg, padding: isMobile ? "8px 12px" : "10px 24px", position: "sticky", top: 0, zIndex: 150 }}>
-        <div style={{ background: T.dark, borderRadius: 18, padding: isMobile ? "8px 12px" : "8px 8px 8px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 4px 24px rgba(44,24,16,0.18)", maxWidth: 1080, margin: "0 auto" }}>
-        <button onClick={() => setView("home")} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", color: "#FAF3E4", cursor: "pointer", padding: 0 }}>
-          <svg width="40" height="40" viewBox="0 0 140 140" fill="none">
-            <circle cx="70" cy="70" r="68" fill="#C8912A"/>
-            <circle cx="70" cy="70" r="62" fill="none" stroke="#FAF3E4" strokeWidth="1.2"/>
-            <circle cx="70" cy="70" r="56" fill="none" stroke="#FAF3E4" strokeWidth="0.5" strokeDasharray="3 4"/>
-            <g transform="translate(70,70)">
-              <path d="M-42,0 Q-38,-11 -26,-11 L26,-11 Q38,-11 42,0 Q38,11 26,11 L-26,11 Q-38,11 -42,0Z" fill="#2C1810"/>
-              <path d="M-38,-2 Q-28,-9 0,-9 Q22,-9 38,-2" stroke="#5A3020" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.5"/>
-              <line x1="-28" y1="-12" x2="-22" y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.5"/>
-              <line x1="-15" y1="-12" x2="-9" y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.5"/>
-              <line x1="-2" y1="-12" x2="4" y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.5"/>
-              <line x1="11" y1="-12" x2="17" y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.5"/>
-              <line x1="24" y1="-12" x2="30" y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.5"/>
-            </g>
-          </svg>
-          <div style={{ textAlign: "left" }}>
-            <div style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 16 : 18, fontWeight: 900, lineHeight: 1.15, color: "#FAF3E4" }}>Loafly</div>
-            {!isMobile && <div style={{ fontSize: 11, color: `${T.gold}99` }}>Boulangeries artisanales · Montréal</div>}
-          </div>
-        </button>
+      <header style={{ background: T.dark, position: "sticky", top: 0, zIndex: 150, borderBottom: `1px solid ${T.gold}20`, boxShadow: "0 4px 28px rgba(44,24,16,0.22)" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: isMobile ? "0 16px" : "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between", height: isMobile ? 62 : 74 }}>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {/* Nav desktop uniquement */}
+          {/* ── Logo ── */}
+          <button onClick={() => setView("home")} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", border: "none", color: "#FAF3E4", cursor: "pointer", padding: 0, flexShrink: 0 }}>
+            <LogoSVG size={isMobile ? 38 : 48} />
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 17 : 21, fontWeight: 900, lineHeight: 1.1, color: "#FAF3E4" }}>Loafly</div>
+              {!isMobile && <div style={{ fontSize: 11, color: `${T.gold}88`, letterSpacing: "0.05em", marginTop: 1 }}>Boulangeries artisanales · Montréal</div>}
+            </div>
+          </button>
+
+          {/* ── Nav desktop ── */}
           {!isMobile && (
-            <nav style={{ display: "flex", alignItems: "center", gap: 4, background: "#ffffff0f", borderRadius: 12, padding: 4 }}>
+            <nav style={{ display: "flex", alignItems: "stretch", height: "100%", gap: 2 }}>
               {VIEWS.map(({ id, icon, label }) => (
                 <button key={id} onClick={() => setView(id)}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "none", borderRadius: 9, background: view === id ? T.gold : "transparent", color: view === id ? "white" : "#FAF3E460", fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>
-                  <span style={{ fontSize: 14 }}>{icon}</span> {label}
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 22px", border: "none", borderBottom: `3px solid ${view === id ? T.gold : "transparent"}`, borderTop: "3px solid transparent", background: "none", color: view === id ? "#FAF3E4" : "#FAF3E455", fontSize: 14.5, cursor: "pointer", fontFamily: "inherit", fontWeight: view === id ? 600 : 400, transition: "color 0.18s, border-color 0.18s", whiteSpace: "nowrap" }}>
+                  <span style={{ fontSize: 17 }}>{icon}</span>
+                  {label}
                 </button>
               ))}
             </nav>
           )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: isMobile ? 0 : 8 }}>
+          {/* ── Auth ── */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
             {user ? (
               <>
-                {!isMobile && <span style={{ fontSize: 13, color: T.gold }}>@{user.username}</span>}
-                <button onClick={logout} style={{ background: "none", border: "1px solid #FFFFFF30", color: "#FAF3E470", padding: "5px 10px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>
+                {!isMobile && (
+                  <span style={{ fontSize: 13, color: `${T.gold}CC`, fontStyle: "italic" }}>@{user.username}</span>
+                )}
+                <button onClick={logout} style={{ background: "none", border: "1px solid #FFFFFF22", color: "#FAF3E460", padding: isMobile ? "6px 12px" : "8px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>
                   {isMobile ? "↪" : "Déconnexion"}
                 </button>
               </>
             ) : (
-              <button onClick={() => setShowAuth(true)} style={{ background: T.gold, border: "none", color: "white", padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+              <button onClick={() => setShowAuth(true)} style={{ background: `linear-gradient(135deg, ${T.gold}, #E8B84B)`, border: "none", color: "white", padding: isMobile ? "8px 16px" : "10px 22px", borderRadius: 9, fontSize: isMobile ? 13 : 14, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, boxShadow: `0 3px 14px ${T.gold}44`, whiteSpace: "nowrap" }}>
                 {isMobile ? "Connexion" : "Se connecter"}
               </button>
             )}
           </div>
-        </div>
+
         </div>
       </header>
 
       {/* ── Contenu principal ── */}
-      <main style={{ paddingBottom: isMobile ? 64 : 0 }}>
+      <main style={{ paddingBottom: isMobile ? 72 : 0 }}>
         {view === "home" && <HomeView onNavigate={setView} onShowAuth={() => setShowAuth(true)} />}
         {view !== "home" && (
           <div style={{ padding: isMobile ? "16px" : "32px", maxWidth: 1080, margin: "0 auto" }}>
@@ -1889,12 +1873,12 @@ function Shell() {
 
       {/* ── Navigation mobile en bas ── */}
       {isMobile && (
-        <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: T.dark, borderTop: `1px solid ${T.gold}33`, display: "flex", zIndex: 190, height: 58 }}>
+        <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: T.dark, borderTop: `1px solid ${T.gold}22`, display: "flex", zIndex: 190, height: 64, boxShadow: "0 -4px 24px rgba(44,24,16,0.2)" }}>
           {VIEWS.map(({ id, icon, label }) => (
             <button key={id} onClick={() => setView(id)}
-              style={{ flex: 1, background: view === id ? `${T.gold}18` : "none", border: "none", borderTop: `2px solid ${view === id ? T.gold : "transparent"}`, color: view === id ? T.gold : "#FAF3E450", fontSize: 9, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, padding: "6px 2px 8px" }}>
-              <span style={{ fontSize: 19 }}>{icon}</span>
-              {label}
+              style={{ flex: 1, background: "none", border: "none", borderTop: `2.5px solid ${view === id ? T.gold : "transparent"}`, color: view === id ? T.gold : "#FAF3E440", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, padding: "8px 4px 10px", fontFamily: "inherit", transition: "color 0.18s, border-color 0.18s" }}>
+              <span style={{ fontSize: 22, lineHeight: 1 }}>{icon}</span>
+              <span style={{ fontSize: 10.5, fontWeight: view === id ? 600 : 400, letterSpacing: "0.02em" }}>{label}</span>
             </button>
           ))}
         </nav>
