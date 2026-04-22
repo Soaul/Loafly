@@ -1503,52 +1503,62 @@ function HomeView({ onNavigate, onShowAuth }) {
                 Voir les classements →
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(268px, 1fr))", gap: 16 }}>
-              {productTypes.map(pt => {
-                const ranking = allRankings[pt.id] || [];
-                const winner = ranking[0];
-                return (
-                  <div key={pt.id} onClick={() => onNavigate("rankings")}
-                    style={{ background: "white", borderRadius: 16, overflow: "hidden", border: `1px solid ${T.border}`, cursor: "pointer", boxShadow: "0 2px 10px rgba(44,24,16,0.06)", transition: "transform 0.18s, box-shadow 0.18s" }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(44,24,16,0.12)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 10px rgba(44,24,16,0.06)"; }}>
-                    <div style={{ background: T.dark, padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontSize: 22 }}>{pt.emoji}</span>
-                        <span style={{ fontFamily: '"Playfair Display", serif', fontSize: 15, fontWeight: 700, color: "#FAF3E4" }}>{pt.name}</span>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 16 }}>
+              {[...productTypes]
+                .sort((a, b) => {
+                  const totA = (allRankings[a.id] || []).reduce((s, r) => s + (r.rating_count || 0), 0);
+                  const totB = (allRankings[b.id] || []).reduce((s, r) => s + (r.rating_count || 0), 0);
+                  return totB - totA;
+                })
+                .slice(0, 3)
+                .map(pt => {
+                  const ranking = allRankings[pt.id] || [];
+                  const winner = ranking[0];
+                  const scores = winner?.aggregated_scores && typeof winner.aggregated_scores === "object" && !Array.isArray(winner.aggregated_scores)
+                    ? Object.entries(winner.aggregated_scores).slice(0, 2)
+                    : [];
+                  return (
+                    <div key={pt.id} onClick={() => onNavigate("rankings")}
+                      style={{ background: "white", borderRadius: 16, overflow: "hidden", border: `1px solid ${T.border}`, cursor: "pointer", boxShadow: "0 2px 10px rgba(44,24,16,0.06)", transition: "transform 0.18s, box-shadow 0.18s" }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(44,24,16,0.12)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 10px rgba(44,24,16,0.06)"; }}>
+                      <div style={{ background: T.dark, padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ fontSize: 22 }}>{pt.emoji}</span>
+                          <span style={{ fontFamily: '"Playfair Display", serif', fontSize: 15, fontWeight: 700, color: "#FAF3E4" }}>{pt.name}</span>
+                        </div>
+                        {ranking.length > 0 && <span style={{ fontSize: 11, color: `${T.gold}CC`, fontWeight: 600, letterSpacing: "0.05em" }}>{ranking.length} BOUL.</span>}
                       </div>
-                      {ranking.length > 0 && <span style={{ fontSize: 11, color: `${T.gold}CC`, fontWeight: 600, letterSpacing: "0.05em" }}>{ranking.length} BOUL.</span>}
-                    </div>
-                    <div style={{ padding: "16px 18px 18px" }}>
-                      {!winner ? (
-                        <div style={{ color: T.muted, fontSize: 13, fontStyle: "italic", textAlign: "center", padding: "12px 0" }}>Aucun avis encore</div>
-                      ) : (
-                        <>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                            <span style={{ fontSize: 20 }}>🥇</span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 15, fontWeight: 700, color: T.dark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{winner.bakery.name}</div>
-                              {winner.bakery.neighborhood && <div style={{ fontSize: 11, color: T.muted, marginTop: 1 }}>{winner.bakery.neighborhood}</div>}
-                            </div>
-                            <div style={{ fontSize: 20, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1, flexShrink: 0 }}>{winner.overall_average.toFixed(1)}</div>
-                          </div>
-                          {winner.aggregated_scores && winner.aggregated_scores.slice(0, 2).map(({ criterion_name, average }) => (
-                            <div key={criterion_name} style={{ marginBottom: 7 }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                                <span style={{ fontSize: 11, color: T.muted, textTransform: "capitalize" }}>{criterion_name}</span>
-                                <span style={{ fontSize: 11, color: T.gold, fontWeight: 600 }}>{average.toFixed(1)}</span>
+                      <div style={{ padding: "16px 18px 18px" }}>
+                        {!winner ? (
+                          <div style={{ color: T.muted, fontSize: 13, fontStyle: "italic", textAlign: "center", padding: "12px 0" }}>Aucun avis encore</div>
+                        ) : (
+                          <>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                              <span style={{ fontSize: 20 }}>🥇</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 15, fontWeight: 700, color: T.dark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{winner.bakery.name}</div>
+                                {winner.bakery.neighborhood && <div style={{ fontSize: 11, color: T.muted, marginTop: 1 }}>{winner.bakery.neighborhood}</div>}
                               </div>
-                              <div style={{ height: 4, background: T.border, borderRadius: 3, overflow: "hidden" }}>
-                                <div style={{ height: "100%", width: `${(average / 5) * 100}%`, background: `linear-gradient(90deg, ${T.gold}, #E8B84B)`, borderRadius: 3 }} />
-                              </div>
+                              <div style={{ fontSize: 20, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1, flexShrink: 0 }}>{winner.overall_average.toFixed(1)}</div>
                             </div>
-                          ))}
-                        </>
-                      )}
+                            {scores.map(([name, score]) => (
+                              <div key={name} style={{ marginBottom: 7 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                                  <span style={{ fontSize: 11, color: T.muted, textTransform: "capitalize" }}>{name}</span>
+                                  <span style={{ fontSize: 11, color: T.gold, fontWeight: 600 }}>{Number(score).toFixed(1)}</span>
+                                </div>
+                                <div style={{ height: 4, background: T.border, borderRadius: 3, overflow: "hidden" }}>
+                                  <div style={{ height: "100%", width: `${(score / 5) * 100}%`, background: `linear-gradient(90deg, ${T.gold}, #E8B84B)`, borderRadius: 3 }} />
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </section>
         )}
