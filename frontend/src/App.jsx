@@ -1839,34 +1839,17 @@ function Shell() {
             {user ? (
               <>
                 {!isMobile && <span style={{ fontSize: 13, color: T.gold }}>@{user.username}</span>}
-                <button onClick={logout} style={{ background: "none", border: `1px solid #FFFFFF30`, color: "#FAF3E470", padding: "5px 10px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>
+                <button onClick={logout} style={{ background: "none", border: "1px solid #FFFFFF30", color: "#FAF3E470", padding: "5px 10px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>
                   {isMobile ? "↪" : "Déconnexion"}
                 </button>
               </>
             ) : (
-              <button onClick={() => setShowAuth(true)} style={{ background: T.gold, border: "none", color: "white", padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+              <button onClick={() => setShowAuth(true)} style={{ background: T.gold, border: "none", color: "white", padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
                 {isMobile ? "Connexion" : "Se connecter"}
               </button>
             )}
-
-            <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: isMobile ? 0 : 8 }}>
-              {user ? (
-                <>
-                  {!isMobile && <span style={{ fontSize: 13, color: T.gold }}>@{user.username}</span>}
-                  <button onClick={logout} style={{ background: "none", border: "1px solid #FFFFFF30", color: "#FAF3E470", padding: "5px 10px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>
-                    {isMobile ? "↪" : "Déconnexion"}
-                  </button>
-                </>
-              ) : (
-                <button onClick={() => setShowAuth(true)} style={{ background: T.gold, border: "none", color: "white", padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
-                  {isMobile ? "Connexion" : "Se connecter"}
-                </button>
-              )}
-            </div>
           </div>
         </div>
-        </div>
-      </header>
         </div>
       </header>
 
