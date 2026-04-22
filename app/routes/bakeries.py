@@ -12,6 +12,8 @@ from app.database import get_db
 from app.middleware import success, error, admin_required, user_or_admin_required
 from app.repositories import BakeryRepository, RatingRepository, ProductTypeRepository
 
+
+
 bakeries_bp = Blueprint("bakeries", __name__, url_prefix="/api/bakeries")
 
 
@@ -120,6 +122,33 @@ def get_bakery(bakery_id: str):
         "products": products_summary,
         "total_ratings": len(ratings),
     })
+
+
+@bakeries_bp.put("/<bakery_id>")
+@admin_required
+def update_bakery(bakery_id: str):
+    """Met à jour les informations d'une boulangerie [admin]."""
+    db   = get_db()
+    repo = BakeryRepository(db)
+
+    if not repo.find_by_id(bakery_id):
+        return error("Boulangerie introuvable", "NOT_FOUND", 404)
+
+    body  = request.get_json(silent=True) or {}
+    fields = {}
+    for key in ("name", "neighborhood", "address"):
+        val = str(body.get(key, "")).strip()
+        if val:
+            fields[key] = val
+    for key in ("lat", "lng"):
+        if body.get(key) is not None:
+            fields[key] = body[key]
+
+    if not fields:
+        return error("Aucun champ à mettre à jour", "NO_FIELDS", 400)
+
+    bakery = repo.update(bakery_id, **fields)
+    return success(bakery, "Boulangerie mise à jour")
 
 
 @bakeries_bp.delete("/<bakery_id>")

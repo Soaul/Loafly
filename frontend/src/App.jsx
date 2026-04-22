@@ -86,6 +86,8 @@ const ApiClient = {
       apiFetch(`/bakeries/${id}`),
     create: (payload, adminPin, userToken) =>
       apiFetch("/bakeries/", { method: "POST", body: JSON.stringify(payload) }, adminPin, userToken),
+    update: (id, payload, adminPin) =>
+      apiFetch(`/bakeries/${id}`, { method: "PUT", body: JSON.stringify(payload) }, adminPin),
     remove: (id, adminPin) =>
       apiFetch(`/bakeries/${id}`, { method: "DELETE" }, adminPin),
   },
@@ -96,6 +98,10 @@ const ApiClient = {
       apiFetch("/users/signup", { method: "POST", body: JSON.stringify({ username, email, password }) }),
     login: (email, password) =>
       apiFetch("/users/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+    list: (adminPin) =>
+      apiFetch("/users/", {}, adminPin),
+    remove: (id, adminPin) =>
+      apiFetch(`/users/${id}`, { method: "DELETE" }, adminPin),
   },
 
   // ── Photos ────────────────────────────────────────────────────────────────
@@ -118,6 +124,10 @@ const ApiClient = {
   ratings: {
     submit: (payload, userToken) =>
       apiFetch("/ratings/", { method: "POST", body: JSON.stringify(payload) }, null, userToken),
+    list: (adminPin) =>
+      apiFetch("/ratings/", {}, adminPin),
+    remove: (id, adminPin) =>
+      apiFetch(`/ratings/${id}`, { method: "DELETE" }, adminPin),
   },
 
   // ── Rankings ──────────────────────────────────────────────────────────────
@@ -368,6 +378,17 @@ function useBakeries() {
     } catch (e) { notify(e.message, "error"); return null; }
   }, [adminPin, isAdmin, user, refresh, notify]);
 
+  const updateBakery = useCallback(async (bakeryId, payload) => {
+    if (!isAdmin) { notify("Action réservée à l'admin", "error"); return null; }
+    const coords = payload.address ? (await geocodeAddress(payload.address)) ?? {} : {};
+    try {
+      const b = await ApiClient.bakeries.update(bakeryId, { ...payload, ...coords }, adminPin);
+      await refresh();
+      notify("Boulangerie mise à jour !");
+      return b;
+    } catch (e) { notify(e.message, "error"); return null; }
+  }, [adminPin, isAdmin, refresh, notify]);
+
   const removeBakery = useCallback((bakeryId) => {
     if (!isAdmin) { notify("Action réservée à l'admin", "error"); return; }
     requestConfirm("Supprimer cette boulangerie et tous ses avis ?", async () => {
@@ -379,7 +400,7 @@ function useBakeries() {
     });
   }, [adminPin, isAdmin, refresh, notify, requestConfirm]);
 
-  return { bakeries, addBakery, removeBakery };
+  return { bakeries, addBakery, updateBakery, removeBakery };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -474,6 +495,16 @@ const css = {
   btnGhost: { background: "none",  border: `1px solid ${T.border}`, color: T.danger, padding: "10px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontFamily: "inherit" },
   btnSm:    { background: `${T.gold}22`, color: T.gold, border: `1px solid ${T.gold}55`, padding: "7px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "inherit" },
 };
+
+const MONTREAL_NEIGHBORHOODS = [
+  "Ahuntsic", "Anjou", "Cartierville", "Côte-des-Neiges", "Griffintown",
+  "Hochelaga-Maisonneuve", "Lachine", "LaSalle", "Maisonneuve", "Mercier",
+  "Mile End", "Mile-Ex", "Montréal-Nord", "Notre-Dame-de-Grâce", "Outremont",
+  "Parc-Extension", "Petite-Patrie", "Plateau-Mont-Royal", "Pointe-Saint-Charles",
+  "Rivière-des-Prairies", "Rosemont", "Saint-Laurent", "Saint-Léonard",
+  "Saint-Michel", "Sud-Ouest", "Verdun", "Vieux-Montréal", "Ville-Marie",
+  "Villeray", "Westmount",
+].sort();
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  UI components (inchangés vs v3 — purement présentationnels)
@@ -835,7 +866,10 @@ function AddBakeryModal({ onClose, onSave }) {
         {errors.name && <p style={{ color: T.danger, fontSize: 12, marginTop: 4 }}>Champ requis</p>}
       </Field>
       <Field label="Quartier *">
-        <input value={f.neighborhood} onChange={set("neighborhood")} placeholder="Ex : Plateau-Mont-Royal" style={inputStyle("neighborhood")} />
+        <select value={f.neighborhood} onChange={set("neighborhood")} style={inputStyle("neighborhood")}>
+          <option value="">— Choisir un quartier —</option>
+          {MONTREAL_NEIGHBORHOODS.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
         {errors.neighborhood && <p style={{ color: T.danger, fontSize: 12, marginTop: 4 }}>Champ requis</p>}
       </Field>
       <Field label="Adresse *">
@@ -848,25 +882,68 @@ function AddBakeryModal({ onClose, onSave }) {
   );
 }
 
+function EditBakeryModal({ bakery, onClose, onSave }) {
+  const [f, setF]       = useState({ name: bakery.name, neighborhood: bakery.neighborhood ?? "", address: bakery.address ?? "" });
+  const [errors, setErrors] = useState({});
+  const set = (k) => (e) => { setF((p) => ({ ...p, [k]: e.target.value })); setErrors((p) => ({ ...p, [k]: false })); };
+
+  const handleSubmit = () => {
+    const errs = {};
+    if (!f.name.trim())         errs.name         = true;
+    if (!f.neighborhood.trim()) errs.neighborhood  = true;
+    if (!f.address.trim())      errs.address       = true;
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    onSave(f);
+  };
+
+  const inputStyle = (k) => ({ ...css.input, borderColor: errors[k] ? T.danger : undefined });
+
+  return (
+    <Modal title={`Modifier — ${bakery.name}`} onClose={onClose}>
+      <Field label="Nom *">
+        <input value={f.name} onChange={set("name")} style={inputStyle("name")} />
+        {errors.name && <p style={{ color: T.danger, fontSize: 12, marginTop: 4 }}>Champ requis</p>}
+      </Field>
+      <Field label="Quartier *">
+        <select value={f.neighborhood} onChange={set("neighborhood")} style={inputStyle("neighborhood")}>
+          <option value="">— Choisir un quartier —</option>
+          {MONTREAL_NEIGHBORHOODS.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        {errors.neighborhood && <p style={{ color: T.danger, fontSize: 12, marginTop: 4 }}>Champ requis</p>}
+      </Field>
+      <Field label="Adresse *">
+        <input value={f.address} onChange={set("address")} placeholder="Ex : 1234 rue Saint-Denis" style={inputStyle("address")} />
+        {errors.address && <p style={{ color: T.danger, fontSize: 12, marginTop: 4 }}>Champ requis</p>}
+      </Field>
+      <p style={{ fontSize: 12, color: T.muted, fontStyle: "italic", marginBottom: 12 }}>📍 L'adresse sera regéolocalisée automatiquement.</p>
+      <button onClick={handleSubmit} style={{ ...css.btnGold, marginTop: 4 }}>Enregistrer</button>
+    </Modal>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  views/BakeriesView
 // ─────────────────────────────────────────────────────────────────────────────
 
 function BakeriesView() {
-  const { productTypes, isAdmin, user }         = useApp();
-  const { bakeries, addBakery, removeBakery }   = useBakeries();
+  const { productTypes, isAdmin, user }                       = useApp();
+  const { bakeries, addBakery, updateBakery, removeBakery }   = useBakeries();
   const canAddBakery = isAdmin || !!user;
-  const { submitRating }                       = useRatings();
+  const { submitRating }                                      = useRatings();
 
   const [selectedId,    setSelectedId]    = useState(null);
   const [bakeryDetail,  setBakeryDetail]  = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [showAddBakery, setShowAddBakery] = useState(false);
+  const [showEditBakery, setShowEditBakery] = useState(false);
   const [showAddRating, setShowAddRating] = useState(false);
+  const [filterNeighborhood, setFilterNeighborhood] = useState("");
 
   const selected = bakeries.find((b) => b.id === selectedId);
+  const filtered = filterNeighborhood
+    ? bakeries.filter((b) => b.neighborhood?.toLowerCase().includes(filterNeighborhood.toLowerCase()))
+    : bakeries;
 
-  // Charger le détail complet (avis inclus) depuis l'API
   useEffect(() => {
     if (!selectedId) { setBakeryDetail(null); return; }
     setLoadingDetail(true);
@@ -879,6 +956,15 @@ function BakeriesView() {
   const handleAddBakery = async (payload) => {
     const created = await addBakery(payload);
     if (created) { setSelectedId(created.id); setShowAddBakery(false); }
+  };
+
+  const handleEditBakery = async (payload) => {
+    const updated = await updateBakery(selectedId, payload);
+    if (updated) {
+      setShowEditBakery(false);
+      const detail = await ApiClient.bakeries.get(selectedId);
+      setBakeryDetail(detail);
+    }
   };
 
   const handleAddRating = async (payload, photoFile) => {
@@ -897,11 +983,30 @@ function BakeriesView() {
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 28, alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 28, alignItems: "start" }}>
+      {/* ── Colonne gauche : filtre + liste ── */}
       <div>
-        {canAddBakery && <button onClick={() => setShowAddBakery(true)} style={{ ...css.btnDark, width: "100%", marginBottom: 16 }}>+ Ajouter une boulangerie</button>}
-        {bakeries.length === 0 && <p style={{ color: T.muted, fontStyle: "italic", fontSize: 14 }}>Aucune boulangerie.</p>}
-        {bakeries.map((b) => (
+        {canAddBakery && (
+          <button onClick={() => setShowAddBakery(true)} style={{ ...css.btnDark, width: "100%", marginBottom: 12 }}>
+            + Ajouter une boulangerie
+          </button>
+        )}
+
+        <select
+          value={filterNeighborhood}
+          onChange={(e) => { setFilterNeighborhood(e.target.value); setSelectedId(null); }}
+          style={{ ...css.input, marginBottom: 14, fontSize: 13 }}
+        >
+          <option value="">Tous les quartiers</option>
+          {MONTREAL_NEIGHBORHOODS.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+
+        {filtered.length === 0 && (
+          <p style={{ color: T.muted, fontStyle: "italic", fontSize: 14 }}>
+            {filterNeighborhood ? `Aucune boulangerie à ${filterNeighborhood}.` : "Aucune boulangerie."}
+          </p>
+        )}
+        {filtered.map((b) => (
           <div key={b.id} onClick={() => setSelectedId(b.id)}
             style={{ padding: "12px 16px", marginBottom: 8, borderRadius: 10, cursor: "pointer", background: selectedId === b.id ? T.dark : "white", color: selectedId === b.id ? "#FAF3E4" : T.dark, border: `2px solid ${selectedId === b.id ? T.gold : T.border}`, transition: "all 0.2s" }}>
             <div style={{ fontFamily: '"Playfair Display", serif', fontWeight: 600, fontSize: 15 }}>{b.name}</div>
@@ -911,6 +1016,7 @@ function BakeriesView() {
         ))}
       </div>
 
+      {/* ── Colonne droite : détail ── */}
       <div>
         {!selected ? <EmptyState emoji="🏪" text="Sélectionnez une boulangerie" /> : loadingDetail ? <Spinner /> : bakeryDetail && (
           <>
@@ -920,9 +1026,14 @@ function BakeriesView() {
                 {bakeryDetail.neighborhood && <p style={{ color: T.muted, marginTop: 4 }}>{bakeryDetail.neighborhood}</p>}
                 {bakeryDetail.address && <p style={{ color: T.muted, fontSize: 13 }}>{bakeryDetail.address}</p>}
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                 <button onClick={() => setShowAddRating(true)} style={{ ...css.btnDark, background: T.gold }}>★ Donner mon avis</button>
-                {isAdmin && <button onClick={handleDelete} style={css.btnGhost}>Supprimer</button>}
+                {isAdmin && (
+                  <>
+                    <button onClick={() => setShowEditBakery(true)} style={css.btnSm}>✏️ Modifier</button>
+                    <button onClick={handleDelete} style={css.btnGhost}>Supprimer</button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -953,7 +1064,7 @@ function BakeriesView() {
                             <div style={{ flex: 1 }}>
                               <div style={{ display: "flex", justifyContent: "space-between" }}>
                                 <span style={{ fontSize: 13, fontWeight: 600, color: T.dark }}>{r.author_name}</span>
-                                <span style={{ fontSize: 12, color: T.gold, fontWeight: 600 }}>{(Object.values(r.scores).reduce((a,b) => a+b, 0) / Object.values(r.scores).length).toFixed(1)}/5</span>
+                                <span style={{ fontSize: 12, color: T.gold, fontWeight: 600 }}>{(Object.values(r.scores).reduce((a, b) => a + b, 0) / Object.values(r.scores).length).toFixed(1)}/5</span>
                               </div>
                               {r.note && <p style={{ fontSize: 13, color: T.muted, fontStyle: "italic", marginTop: 4 }}>« {r.note} »</p>}
                             </div>
@@ -969,11 +1080,107 @@ function BakeriesView() {
         )}
       </div>
 
-      {showAddBakery && (
-        <AddBakeryModal onClose={() => setShowAddBakery(false)} onSave={handleAddBakery} />
-      )}
-      {showAddRating && selected && (
-        <AddRatingModal bakery={selected} productTypes={productTypes} onClose={() => setShowAddRating(false)} onSave={handleAddRating} />
+      {showAddBakery  && <AddBakeryModal onClose={() => setShowAddBakery(false)} onSave={handleAddBakery} />}
+      {showEditBakery && bakeryDetail && <EditBakeryModal bakery={bakeryDetail} onClose={() => setShowEditBakery(false)} onSave={handleEditBakery} />}
+      {showAddRating  && selected && <AddRatingModal bakery={selected} productTypes={productTypes} onClose={() => setShowAddRating(false)} onSave={handleAddRating} />}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  views/ModerationView
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ModerationView() {
+  const { adminPin, requestConfirm, notify } = useApp();
+  const [sub,     setSub]     = useState("ratings");
+  const [ratings, setRatings] = useState([]);
+  const [users,   setUsers]   = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const loadRatings = useCallback(async () => {
+    setLoading(true);
+    try { setRatings(await ApiClient.ratings.list(adminPin)); }
+    catch (e) { notify(e.message, "error"); }
+    finally { setLoading(false); }
+  }, [adminPin, notify]);
+
+  const loadUsers = useCallback(async () => {
+    setLoading(true);
+    try { setUsers(await ApiClient.users.list(adminPin)); }
+    catch (e) { notify(e.message, "error"); }
+    finally { setLoading(false); }
+  }, [adminPin, notify]);
+
+  useEffect(() => { sub === "ratings" ? loadRatings() : loadUsers(); }, [sub]);
+
+  const deleteRating = (id) => requestConfirm("Supprimer cet avis ?", async () => {
+    try {
+      await ApiClient.ratings.remove(id, adminPin);
+      setRatings((r) => r.filter((x) => x.id !== id));
+      notify("Avis supprimé");
+    } catch (e) { notify(e.message, "error"); }
+  });
+
+  const deleteUser = (id, username) => requestConfirm(`Supprimer l'utilisateur « ${username} » ?`, async () => {
+    try {
+      await ApiClient.users.remove(id, adminPin);
+      setUsers((u) => u.filter((x) => x.id !== id));
+      notify("Utilisateur supprimé");
+    } catch (e) { notify(e.message, "error"); }
+  });
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 4, background: "white", border: `1px solid ${T.border}`, borderRadius: 10, padding: 4, marginBottom: 24, width: "fit-content" }}>
+        {[["ratings", "💬 Commentaires"], ["users", "👤 Utilisateurs"]].map(([id, label]) => (
+          <button key={id} onClick={() => setSub(id)}
+            style={{ padding: "8px 20px", border: "none", borderRadius: 7, background: sub === id ? T.dark : "transparent", color: sub === id ? "#FAF3E4" : T.muted, fontSize: 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? <Spinner /> : sub === "ratings" ? (
+        ratings.length === 0 ? <EmptyState emoji="💬" text="Aucun commentaire." /> : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {ratings.map((r) => (
+              <div key={r.id} style={{ background: "white", borderRadius: 12, padding: "14px 18px", border: `1px solid ${T.border}`, display: "flex", gap: 14, alignItems: "flex-start" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 4 }}>
+                    <span style={{ fontWeight: 600, color: T.dark, fontSize: 14 }}>{r.author_name}</span>
+                    <span style={{ background: T.bg, padding: "2px 10px", borderRadius: 12, fontSize: 12, color: T.muted, border: `1px solid ${T.border}` }}>{r.bakeries?.name}</span>
+                    <span style={{ fontSize: 12, color: T.gold }}>{r.product_types?.emoji} {r.product_types?.name}</span>
+                    <span style={{ fontSize: 11, color: T.muted, marginLeft: "auto" }}>{new Date(r.created_at).toLocaleDateString("fr-CA")}</span>
+                  </div>
+                  {r.note
+                    ? <p style={{ fontSize: 13, color: T.muted, fontStyle: "italic" }}>« {r.note} »</p>
+                    : <p style={{ fontSize: 12, color: T.border }}>Pas de commentaire</p>
+                  }
+                </div>
+                <button onClick={() => deleteRating(r.id)} style={{ ...css.btnGhost, flexShrink: 0 }}>Supprimer</button>
+              </div>
+            ))}
+          </div>
+        )
+      ) : (
+        users.length === 0 ? <EmptyState emoji="👤" text="Aucun utilisateur." /> : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {users.map((u) => (
+              <div key={u.id} style={{ background: "white", borderRadius: 12, padding: "14px 18px", border: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: T.dark, display: "flex", alignItems: "center", justifyContent: "center", color: T.gold, fontWeight: 700, fontSize: 15, flexShrink: 0 }}>
+                  {u.username[0].toUpperCase()}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, color: T.dark, fontSize: 14 }}>@{u.username}</div>
+                  <div style={{ fontSize: 13, color: T.muted }}>{u.email}</div>
+                  <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>Inscrit le {new Date(u.created_at).toLocaleDateString("fr-CA")}</div>
+                </div>
+                <button onClick={() => deleteUser(u.id, u.username)} style={{ ...css.btnGhost, flexShrink: 0 }}>Supprimer</button>
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   );
@@ -1010,10 +1217,12 @@ function AdminView() {
     <AdminGate>
       <div>
         <div style={{ display: "flex", gap: 4, background: "white", border: `1px solid ${T.border}`, borderRadius: 10, padding: 4, marginBottom: 28, width: "fit-content" }}>
-          {[["products", "📦 Produits & critères"], ["security", "🔑 Sécurité"]].map(([id, label]) => (
+          {[["products", "📦 Produits & critères"], ["moderation", "🛡️ Modération"], ["security", "🔑 Sécurité"]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{ padding: "8px 20px", border: "none", borderRadius: 7, background: tab === id ? T.dark : "transparent", color: tab === id ? "#FAF3E4" : T.muted, fontSize: 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>{label}</button>
           ))}
         </div>
+
+        {tab === "moderation" && <ModerationView />}
 
         {tab === "security" && (
           <div style={{ background: "white", borderRadius: 14, padding: 26, border: `1px solid ${T.border}`, maxWidth: 380 }}>

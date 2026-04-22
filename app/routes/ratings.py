@@ -5,7 +5,7 @@ routes/ratings.py
 
 from flask import Blueprint, request, g
 from app.database import get_db
-from app.middleware import success, error, user_required
+from app.middleware import success, error, user_required, admin_required
 from app.repositories import RatingRepository, BakeryRepository, ProductTypeRepository
 
 ratings_bp = Blueprint("ratings", __name__, url_prefix="/api/ratings")
@@ -75,3 +75,22 @@ def submit_rating():
     )
 
     return success(result.data[0], "Avis enregistré, merci !", 201)
+
+
+@ratings_bp.get("/")
+@admin_required
+def list_ratings():
+    """Tous les avis avec détails boulangerie + produit [admin]."""
+    db      = get_db()
+    ratings = RatingRepository(db).find_all_detailed()
+    return success(ratings)
+
+
+@ratings_bp.delete("/<rating_id>")
+@admin_required
+def delete_rating(rating_id: str):
+    """Supprime un avis [admin]."""
+    db   = get_db()
+    repo = RatingRepository(db)
+    repo.delete_by_id(rating_id)
+    return success(message="Avis supprimé")

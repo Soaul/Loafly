@@ -8,7 +8,7 @@ routes/users.py
 from flask import Blueprint, request, g
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.database import get_db
-from app.middleware import success, error, make_token, user_required
+from app.middleware import success, error, make_token, user_required, admin_required
 
 users_bp = Blueprint("users", __name__, url_prefix="/api/users")
 
@@ -73,3 +73,21 @@ def me():
     if not result.data:
         return error("Utilisateur introuvable", "NOT_FOUND", 404)
     return success(result.data)
+
+
+@users_bp.get("/")
+@admin_required
+def list_users():
+    """Liste tous les utilisateurs [admin]."""
+    db     = get_db()
+    result = db.table("users").select("id, username, email, created_at").order("created_at", desc=True).execute()
+    return success(result.data)
+
+
+@users_bp.delete("/<user_id>")
+@admin_required
+def delete_user(user_id: str):
+    """Supprime un utilisateur [admin]."""
+    db = get_db()
+    db.table("users").delete().eq("id", user_id).execute()
+    return success(message="Utilisateur supprimé")

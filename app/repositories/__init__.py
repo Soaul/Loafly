@@ -147,6 +147,15 @@ class BakeryRepository:
         result = self.db.table("bakeries").insert(row).execute()
         return result.data[0]
 
+    def update(self, bakery_id: str, **fields) -> dict:
+        result = (
+            self.db.table("bakeries")
+            .update(fields)
+            .eq("id", bakery_id)
+            .execute()
+        )
+        return result.data[0]
+
     def delete(self, bakery_id: str) -> None:
         self.db.table("bakeries").delete().eq("id", bakery_id).execute()
 
@@ -204,6 +213,18 @@ class RatingRepository:
             .execute()
         )
         return result.data[0]
+
+    def find_all_detailed(self) -> list[dict]:
+        result = (
+            self.db.table("ratings")
+            .select("*, bakeries(id, name, neighborhood), product_types(id, name, emoji)")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return result.data
+
+    def delete_by_id(self, rating_id: str) -> None:
+        self.db.table("ratings").delete().eq("id", rating_id).execute()
 
     def delete_by_product_type(self, product_type_id: str) -> None:
         """Appelé lors de la suppression d'un product type (cascade DB le fait aussi)."""
