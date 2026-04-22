@@ -1,5 +1,5 @@
 /**
- * Boulangeries MTL — Frontend React (v4 — Flask API)
+ * Loafly — Frontend React (v4 — Flask API)
  *
  * Changement majeur vs v3 :
  *   window.storage  →  fetch() vers l'API Flask
@@ -1058,9 +1058,9 @@ function Footer() {
   return (
     <footer style={{ background: T.dark, color: "#FAF3E4", padding: "40px 32px", marginTop: 64, textAlign: "center" }}>
       <div style={{ fontSize: 32, marginBottom: 10 }}>🥖</div>
-      <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.gold, marginBottom: 6 }}>Boulangeries Montréal</div>
+      <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.gold, marginBottom: 6 }}>Loafly</div>
       <p style={{ fontSize: 13, color: "#FAF3E444", fontStyle: "italic" }}>
-        Guide collaboratif des boulangeries artisanales · Montréal, QC
+        Guide collaboratif des boulangeries artisanales · Montréal, QC · Loafly
       </p>
     </footer>
   );
@@ -1101,7 +1101,7 @@ function HomeView({ onNavigate, onShowAuth }) {
         <div style={{ position: "absolute", bottom: -20, right: "8%", fontSize: 180, opacity: 0.03, transform: "rotate(15deg)", lineHeight: 1 }}>🥐</div>
         <div style={{ position: "relative", zIndex: 1, maxWidth: 640, margin: "0 auto" }}>
           <div style={{ display: "inline-block", background: `${T.gold}22`, border: `1px solid ${T.gold}44`, color: T.gold, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", padding: "6px 16px", borderRadius: 20, marginBottom: 22 }}>
-            Guide de dégustation artisanale
+            Boulangeries artisanales · Montréal
           </div>
           <h1 style={{ fontFamily: '"Playfair Display", serif', fontSize: "clamp(36px, 6vw, 60px)", fontWeight: 900, color: "#FAF3E4", lineHeight: 1.1, marginBottom: 18 }}>
             Les meilleures<br />boulangeries de<br />
@@ -1333,8 +1333,8 @@ function Shell() {
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <span style={{ fontSize: 26 }}>🥖</span>
           <div>
-            <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, fontWeight: 900, lineHeight: 1.1 }}>Boulangeries Montréal</div>
-            <div style={{ fontSize: 11, color: T.gold, fontStyle: "italic" }}>Guide de dégustation artisanale</div>
+            <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, fontWeight: 900, lineHeight: 1.1 }}>Loafly</div>
+            <div style={{ fontSize: 11, color: T.gold, fontStyle: "italic" }}>Boulangeries artisanales · Montréal</div>
           </div>
         </div>
 
