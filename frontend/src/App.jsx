@@ -1022,7 +1022,7 @@ function EditBakeryModal({ bakery, onClose, onSave }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function BakeriesView() {
-  const { productTypes, isAdmin, user }                       = useApp();
+  const { productTypes, isAdmin, user, isMobile }             = useApp();
   const { bakeries, addBakery, updateBakery, removeBakery }   = useBakeries();
   const canAddBakery = isAdmin || !!user;
   const { submitRating }                                      = useRatings();
@@ -1079,7 +1079,7 @@ function BakeriesView() {
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 28, alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "300px 1fr", gap: isMobile ? 16 : 28, alignItems: "start" }}>
       {/* ── Colonne gauche : filtre + liste ── */}
       <div>
         {canAddBakery && (
@@ -1116,13 +1116,13 @@ function BakeriesView() {
       <div>
         {!selected ? <EmptyState emoji="🏪" text="Sélectionnez une boulangerie" /> : loadingDetail ? <Spinner /> : bakeryDetail && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
-              <div>
-                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 24, color: T.dark }}>{bakeryDetail.name}</h2>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, gap: 12, flexWrap: "wrap" }}>
+              <div style={{ minWidth: 0 }}>
+                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 20 : 24, color: T.dark }}>{bakeryDetail.name}</h2>
                 {bakeryDetail.neighborhood && <p style={{ color: T.muted, marginTop: 4 }}>{bakeryDetail.neighborhood}</p>}
                 {bakeryDetail.address && <p style={{ color: T.muted, fontSize: 13 }}>{bakeryDetail.address}</p>}
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flexShrink: 0 }}>
                 <button onClick={() => setShowAddRating(true)} style={{ ...css.btnDark, background: T.gold }}>★ Donner mon avis</button>
                 {isAdmin && (
                   <>
@@ -1287,7 +1287,7 @@ function ModerationView() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function AdminView() {
-  const { productTypes }                                                                   = useApp();
+  const { productTypes, isMobile }                                                        = useApp();
   const { addProductType, removeProductType, addCriterion, removeCriterion }              = useProductTypes();
   const { logout, changePassword }                                                        = useAdminAuth();
 
@@ -1345,7 +1345,7 @@ function AdminView() {
               <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 22, color: T.dark }}>Produits & critères</h2>
               <button onClick={() => setShowAddPt(true)} style={css.btnDark}>+ Nouveau produit</button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 24, alignItems: "start" }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "260px 1fr", gap: 20, alignItems: "start" }}>
               <div>
                 {productTypes.map((pt) => (
                   <div key={pt.id} onClick={() => setSelectedPtId(pt.id)}
@@ -1438,106 +1438,107 @@ function HomeView({ onNavigate, onShowAuth }) {
   const totalAvis = overallRanking.reduce((a, b) => a + b.total_ratings, 0);
 
   return (
-    <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "16px" : "32px" }}>
-
-      {/* ── Hero card deux colonnes ───────────────────────── */}
-      <div style={{ background: `linear-gradient(135deg, ${T.dark}, #4A2A18)`, borderRadius: 20, padding: isMobile ? "32px 24px" : "48px 40px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, flexWrap: "wrap", overflow: "hidden", position: "relative" }}>
-        {/* Cercles décoratifs */}
-        <div style={{ position: "absolute", right: -60, top: -60, width: 260, height: 260, borderRadius: "50%", border: `1px solid ${T.gold}22`, pointerEvents: "none" }} />
-        <div style={{ position: "absolute", right: -30, top: -30, width: 180, height: 180, borderRadius: "50%", border: `1px solid ${T.gold}15`, pointerEvents: "none" }} />
-
-        {/* Colonne texte */}
-        <div style={{ flex: "1 1 300px" }}>
-          <div style={{ fontSize: 11, color: T.gold, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 12 }}>
-            Montréal · Guide artisanal
-          </div>
-          <h1 style={{ fontFamily: '"Playfair Display", serif', fontSize: "clamp(26px, 4vw, 38px)", fontWeight: 900, color: "#FAF3E4", lineHeight: 1.15, marginBottom: 14 }}>
-            Les meilleures<br />boulangeries<br /><span style={{ color: T.gold }}>de Montréal</span>
-          </h1>
-          <p style={{ fontSize: 15, color: "#FAF3E4BB", lineHeight: 1.6, marginBottom: 28, maxWidth: 420 }}>
-            Découvrez, évaluez et partagez vos coups de cœur parmi les artisans boulangers de la métropole.
-          </p>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <button onClick={() => onNavigate("bakeries")}
-              style={{ ...css.btnGold, width: "auto", padding: "12px 28px", fontSize: 15 }}>
-              🏪 Explorer les boulangeries
-            </button>
-            <button onClick={() => onNavigate("rankings")}
-              style={{ background: "#ffffff15", border: "1px solid #ffffff30", color: "#FAF3E4", padding: "12px 24px", borderRadius: 10, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>
-              🏆 Voir les classements
-            </button>
-          </div>
-        </div>
-
-        {/* Mini podium top 3 */}
-        {!isMobile && top3.length > 0 && (
-          <div style={{ flex: "0 1 280px", display: "flex", flexDirection: "column", gap: 10 }}>
-            {top3.map(({ bakery, overall_average, total_ratings }, i) => (
-              <div key={bakery.id}
-                onClick={() => onNavigate("rankings")}
-                style={{ background: i === 0 ? `${T.gold}22` : "#ffffff0a", border: `1px solid ${i === 0 ? T.gold + "55" : "#ffffff15"}`, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
-                <span style={{ fontSize: i === 0 ? 24 : 20 }}>{medals[i]}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: '"Playfair Display", serif', fontSize: i === 0 ? 15 : 13, fontWeight: 700, color: "#FAF3E4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{bakery.name}</div>
-                  <div style={{ fontSize: 11, color: "#FAF3E460", marginTop: 1 }}>{bakery.neighborhood} · {total_ratings} avis</div>
-                </div>
-                <div style={{ fontSize: i === 0 ? 22 : 18, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>{overall_average.toFixed(1)}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Stats ────────────────────────────────────────── */}
-      <div style={{ background: `linear-gradient(135deg, ${T.gold}, #E8B84B)`, borderRadius: 14, padding: "20px 28px", display: "flex", justifyContent: "center", gap: "clamp(24px, 6vw, 72px)", flexWrap: "wrap", marginBottom: 48, boxShadow: "0 4px 16px rgba(200,145,42,0.25)" }}>
-        {[
-          ["🏪", bakeries.length,      "boulangeries"],
-          ["🥖", productTypes.length,  "produits notés"],
-          ["⭐", totalAvis || "—",     "avis déposés"],
-        ].map(([icon, num, label]) => (
-          <div key={label} style={{ textAlign: "center", color: "white" }}>
-            <div style={{ fontSize: 22 }}>{icon}</div>
-            <div style={{ fontSize: 30, fontWeight: 700, fontFamily: '"Playfair Display", serif', lineHeight: 1.1 }}>{num}</div>
-            <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>{label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Top boulangeries ─────────────────────────── */}
-      <div>
-        {!loadingOverall && top3.length > 0 && (
-          <section style={{ marginBottom: 64 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 28 }}>
-              <div>
-                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 30, color: T.dark }}>🏆 Meilleures boulangeries</h2>
-                <p style={{ color: T.muted, fontSize: 14, marginTop: 4, fontStyle: "italic" }}>Classées sur la moyenne de tous les produits évalués</p>
-              </div>
+    <div>
+      {/* ── Hero plein écran ── */}
+      <div style={{ background: `linear-gradient(135deg, ${T.dark}, #4A2A18)`, overflow: "hidden", position: "relative" }}>
+        <div style={{ position: "absolute", right: -60, top: -60, width: 300, height: 300, borderRadius: "50%", border: `1px solid ${T.gold}22`, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", right: -30, top: -30, width: 200, height: 200, borderRadius: "50%", border: `1px solid ${T.gold}15`, pointerEvents: "none" }} />
+        <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "40px 20px" : "64px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, flexWrap: "wrap" }}>
+          {/* Colonne texte */}
+          <div style={{ flex: "1 1 280px" }}>
+            <div style={{ fontSize: 11, color: T.gold, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 12 }}>
+              Montréal · Guide artisanal
+            </div>
+            <h1 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? "clamp(30px, 8vw, 38px)" : "clamp(32px, 4vw, 48px)", fontWeight: 900, color: "#FAF3E4", lineHeight: 1.15, marginBottom: 14 }}>
+              Les meilleures<br />boulangeries<br /><span style={{ color: T.gold }}>de Montréal</span>
+            </h1>
+            <p style={{ fontSize: isMobile ? 14 : 15, color: "#FAF3E4BB", lineHeight: 1.6, marginBottom: 28, maxWidth: 420 }}>
+              Découvrez, évaluez et partagez vos coups de cœur parmi les artisans boulangers de la métropole.
+            </p>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <button onClick={() => onNavigate("bakeries")}
+                style={{ ...css.btnGold, width: "auto", padding: isMobile ? "11px 20px" : "12px 28px", fontSize: isMobile ? 14 : 15 }}>
+                🏪 Explorer les boulangeries
+              </button>
               <button onClick={() => onNavigate("rankings")}
-                style={{ background: "none", border: "none", color: T.gold, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>
+                style={{ background: "#ffffff15", border: "1px solid #ffffff30", color: "#FAF3E4", padding: isMobile ? "11px 16px" : "12px 24px", borderRadius: 10, fontSize: isMobile ? 14 : 15, cursor: "pointer", fontFamily: "inherit" }}>
+                🏆 Classements
+              </button>
+            </div>
+          </div>
+
+          {/* Mini podium top 3 — desktop uniquement */}
+          {!isMobile && top3.length > 0 && (
+            <div style={{ flex: "0 1 280px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {top3.map(({ bakery, overall_average, total_ratings }, i) => (
+                <div key={bakery.id} onClick={() => onNavigate("rankings")}
+                  style={{ background: i === 0 ? `${T.gold}22` : "#ffffff0a", border: `1px solid ${i === 0 ? T.gold + "55" : "#ffffff15"}`, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                  <span style={{ fontSize: i === 0 ? 24 : 20 }}>{medals[i]}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: '"Playfair Display", serif', fontSize: i === 0 ? 15 : 13, fontWeight: 700, color: "#FAF3E4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{bakery.name}</div>
+                    <div style={{ fontSize: 11, color: "#FAF3E460", marginTop: 1 }}>{bakery.neighborhood} · {total_ratings} avis</div>
+                  </div>
+                  <div style={{ fontSize: i === 0 ? 22 : 18, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>{overall_average.toFixed(1)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Stats plein écran ── */}
+      <div style={{ background: `linear-gradient(135deg, ${T.gold}, #E8B84B)`, boxShadow: "0 4px 16px rgba(200,145,42,0.25)" }}>
+        <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "16px 20px" : "20px 40px", display: "flex", justifyContent: "center", gap: "clamp(20px, 6vw, 72px)", flexWrap: "wrap" }}>
+          {[
+            ["🏪", bakeries.length,     "boulangeries"],
+            ["🥖", productTypes.length, "produits notés"],
+            ["⭐", totalAvis || "—",    "avis déposés"],
+          ].map(([icon, num, label]) => (
+            <div key={label} style={{ textAlign: "center", color: "white" }}>
+              <div style={{ fontSize: isMobile ? 18 : 22 }}>{icon}</div>
+              <div style={{ fontSize: isMobile ? 22 : 30, fontWeight: 700, fontFamily: '"Playfair Display", serif', lineHeight: 1.1 }}>{num}</div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Sections ── */}
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "28px 16px 48px" : "56px 32px 72px" }}>
+
+        {/* ── Top boulangeries ─────────────────────────── */}
+        {!loadingOverall && top3.length > 0 && (
+          <section style={{ marginBottom: isMobile ? 40 : 64 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
+              <div>
+                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 22 : 28, color: T.dark }}>🏆 Meilleures boulangeries</h2>
+                {!isMobile && <p style={{ color: T.muted, fontSize: 14, marginTop: 4, fontStyle: "italic" }}>Classées sur la moyenne de tous les produits évalués</p>}
+              </div>
+              <button onClick={() => onNavigate("rankings")} style={{ background: "none", border: "none", color: T.gold, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>
                 Classement complet →
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
               {top3.map(({ bakery, overall_average, total_ratings, product_averages }, i) => (
                 <div key={bakery.id} onClick={() => onNavigate("bakeries")}
-                  style={{ background: i === 0 ? `linear-gradient(140deg, ${T.dark} 0%, #4A2A18 100%)` : "white", color: i === 0 ? "#FAF3E4" : T.dark, borderRadius: 18, padding: "26px 24px", border: `2px solid ${i === 0 ? T.gold : T.border}`, cursor: "pointer", boxShadow: i === 0 ? `0 8px 32px ${T.gold}33` : "0 2px 12px rgba(0,0,0,0.06)", transition: "transform 0.18s" }}
+                  style={{ background: i === 0 ? `linear-gradient(140deg, ${T.dark} 0%, #4A2A18 100%)` : "white", color: i === 0 ? "#FAF3E4" : T.dark, borderRadius: 18, padding: isMobile ? "20px 18px" : "26px 24px", border: `2px solid ${i === 0 ? T.gold : T.border}`, cursor: "pointer", boxShadow: i === 0 ? `0 8px 32px ${T.gold}33` : "0 2px 12px rgba(0,0,0,0.06)", transition: "transform 0.18s" }}
                   onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-3px)"}
                   onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
-                  <div style={{ fontSize: 34, marginBottom: 10 }}>{medals[i]}</div>
-                  <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, fontWeight: 700, marginBottom: 3 }}>{bakery.name}</div>
-                  {bakery.neighborhood && <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 16 }}>{bakery.neighborhood}</div>}
-                  <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-                    <span style={{ fontSize: 38, fontWeight: 700, color: T.gold, lineHeight: 1, fontFamily: '"Playfair Display", serif' }}>{overall_average.toFixed(1)}</span>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>{medals[i]}</div>
+                  <div style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 17 : 20, fontWeight: 700, marginBottom: 3 }}>{bakery.name}</div>
+                  {bakery.neighborhood && <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 12 }}>{bakery.neighborhood}</div>}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <span style={{ fontSize: isMobile ? 30 : 36, fontWeight: 700, color: T.gold, lineHeight: 1, fontFamily: '"Playfair Display", serif' }}>{overall_average.toFixed(1)}</span>
                     <div>
                       <div style={{ display: "flex", gap: 2 }}>
-                        {[1,2,3,4,5].map(s => <span key={s} style={{ color: s <= Math.round(overall_average) ? T.gold : (i === 0 ? "#FFFFFF25" : T.border), fontSize: 15 }}>★</span>)}
+                        {[1,2,3,4,5].map(s => <span key={s} style={{ color: s <= Math.round(overall_average) ? T.gold : (i === 0 ? "#FFFFFF25" : T.border), fontSize: 14 }}>★</span>)}
                       </div>
-                      <div style={{ fontSize: 12, opacity: 0.55, marginTop: 3 }}>{total_ratings} avis</div>
+                      <div style={{ fontSize: 12, opacity: 0.55, marginTop: 2 }}>{total_ratings} avis</div>
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {product_averages.slice(0, 3).map(({ product_type, average }) => (
-                      <span key={product_type.id} style={{ background: i === 0 ? "#FFFFFF14" : T.bg, padding: "4px 12px", borderRadius: 20, fontSize: 12, border: `1px solid ${i === 0 ? "#FFFFFF18" : T.border}` }}>
+                      <span key={product_type.id} style={{ background: i === 0 ? "#FFFFFF14" : T.bg, padding: "3px 10px", borderRadius: 20, fontSize: 12, border: `1px solid ${i === 0 ? "#FFFFFF18" : T.border}` }}>
                         {product_type.emoji} {average.toFixed(1)}
                       </span>
                     ))}
@@ -1550,21 +1551,20 @@ function HomeView({ onNavigate, onShowAuth }) {
 
         {/* ── Par produit ───────────────────────────────── */}
         {productTypes.length > 0 && (
-          <section style={{ marginBottom: 64 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 20 }}>
+          <section style={{ marginBottom: isMobile ? 40 : 64 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
               <div>
-                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 30, color: T.dark }}>Explorer par produit</h2>
-                <p style={{ color: T.muted, fontSize: 14, marginTop: 4, fontStyle: "italic" }}>Qui fait le meilleur croissant ? La meilleure baguette ?</p>
+                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 22 : 28, color: T.dark }}>Explorer par produit</h2>
+                {!isMobile && <p style={{ color: T.muted, fontSize: 14, marginTop: 4, fontStyle: "italic" }}>Qui fait le meilleur croissant ? La meilleure baguette ?</p>}
               </div>
-              <button onClick={() => onNavigate("rankings")}
-                style={{ background: "none", border: "none", color: T.gold, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>
+              <button onClick={() => onNavigate("rankings")} style={{ background: "none", border: "none", color: T.gold, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>
                 Voir tout →
               </button>
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
               {productTypes.map(pt => (
                 <button key={pt.id} onClick={() => handlePtChange(pt.id)}
-                  style={{ padding: "10px 22px", border: `2px solid ${activePt === pt.id ? T.gold : T.border}`, background: activePt === pt.id ? T.gold : "white", color: activePt === pt.id ? "white" : T.muted, borderRadius: 30, fontSize: 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", fontWeight: activePt === pt.id ? 600 : 400 }}>
+                  style={{ padding: isMobile ? "8px 16px" : "10px 22px", border: `2px solid ${activePt === pt.id ? T.gold : T.border}`, background: activePt === pt.id ? T.gold : "white", color: activePt === pt.id ? "white" : T.muted, borderRadius: 30, fontSize: isMobile ? 13 : 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", fontWeight: activePt === pt.id ? 600 : 400 }}>
                   {pt.emoji} {pt.name}
                 </button>
               ))}
@@ -1574,14 +1574,14 @@ function HomeView({ onNavigate, onShowAuth }) {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {productRanking.slice(0, 5).map(({ bakery, overall_average, rating_count }, i) => (
-                  <div key={bakery.id} style={{ background: "white", borderRadius: 14, padding: "16px 22px", border: `1px solid ${i === 0 ? T.gold : T.border}`, display: "flex", alignItems: "center", gap: 18, boxShadow: i === 0 ? `0 2px 12px ${T.gold}22` : "none" }}>
-                    <div style={{ fontSize: 22, minWidth: 34, textAlign: "center" }}>{medals[i] ?? `#${i+1}`}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 17, color: T.dark }}>{bakery.name}</div>
-                      {bakery.neighborhood && <div style={{ fontSize: 13, color: T.muted }}>{bakery.neighborhood}</div>}
+                  <div key={bakery.id} style={{ background: "white", borderRadius: 14, padding: "14px 18px", border: `1px solid ${i === 0 ? T.gold : T.border}`, display: "flex", alignItems: "center", gap: 14, boxShadow: i === 0 ? `0 2px 12px ${T.gold}22` : "none" }}>
+                    <div style={{ fontSize: 20, minWidth: 30, textAlign: "center" }}>{medals[i] ?? `#${i+1}`}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 15 : 17, color: T.dark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{bakery.name}</div>
+                      {bakery.neighborhood && <div style={{ fontSize: 12, color: T.muted }}>{bakery.neighborhood}</div>}
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 26, fontWeight: 700, color: T.gold, lineHeight: 1, fontFamily: '"Playfair Display", serif' }}>{overall_average.toFixed(1)}</div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: isMobile ? 22 : 26, fontWeight: 700, color: T.gold, lineHeight: 1, fontFamily: '"Playfair Display", serif' }}>{overall_average.toFixed(1)}</div>
                       <div style={{ fontSize: 11, color: T.muted }}>{rating_count} avis</div>
                     </div>
                   </div>
@@ -1593,16 +1593,16 @@ function HomeView({ onNavigate, onShowAuth }) {
 
         {/* ── CTA inscription ───────────────────────────── */}
         {!user && (
-          <section style={{ background: `linear-gradient(135deg, ${T.dark} 0%, #4A2A18 100%)`, borderRadius: 22, padding: "48px 40px", textAlign: "center", color: "#FAF3E4", position: "relative", overflow: "hidden" }}>
+          <section style={{ background: `linear-gradient(135deg, ${T.dark} 0%, #4A2A18 100%)`, borderRadius: 20, padding: isMobile ? "36px 24px" : "48px 40px", textAlign: "center", color: "#FAF3E4", position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", right: -20, top: -20, fontSize: 120, opacity: 0.05 }}>✍️</div>
             <div style={{ position: "relative", zIndex: 1 }}>
-              <div style={{ fontSize: 44, marginBottom: 14 }}>✍️</div>
-              <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: 26, marginBottom: 10 }}>Vous avez un avis à partager ?</h3>
-              <p style={{ color: `${T.gold}BB`, marginBottom: 28, fontStyle: "italic", lineHeight: 1.6 }}>
-                Créez un compte gratuit pour noter les boulangeries,<br />ajouter des établissements et contribuer au guide.
+              <div style={{ fontSize: isMobile ? 36 : 44, marginBottom: 12 }}>✍️</div>
+              <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 20 : 26, marginBottom: 10 }}>Vous avez un avis à partager ?</h3>
+              <p style={{ color: `${T.gold}BB`, marginBottom: 24, fontStyle: "italic", lineHeight: 1.6, fontSize: isMobile ? 14 : 15 }}>
+                Créez un compte gratuit pour noter les boulangeries<br />et contribuer au guide.
               </p>
               <button onClick={onShowAuth}
-                style={{ background: T.gold, color: "white", border: "none", padding: "14px 32px", borderRadius: 10, fontSize: 15, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, boxShadow: `0 4px 20px ${T.gold}44` }}>
+                style={{ background: T.gold, color: "white", border: "none", padding: "13px 28px", borderRadius: 10, fontSize: 15, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, boxShadow: `0 4px 20px ${T.gold}44` }}>
                 Créer un compte gratuit
               </button>
             </div>
