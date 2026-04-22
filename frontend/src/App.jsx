@@ -504,6 +504,23 @@ const css = {
   btnSm:    { background: `${T.gold}22`, color: T.gold, border: `1px solid ${T.gold}55`, padding: "7px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "inherit" },
 };
 
+const LogoSVG = ({ size = 40 }) => (
+  <svg width={size} height={size} viewBox="0 0 140 140" fill="none">
+    <circle cx="70" cy="70" r="68" fill="#C8912A"/>
+    <circle cx="70" cy="70" r="62" fill="none" stroke="#FAF3E4" strokeWidth="1.2"/>
+    <circle cx="70" cy="70" r="56" fill="none" stroke="#FAF3E4" strokeWidth="0.5" strokeDasharray="3 4"/>
+    <g transform="translate(70,70)">
+      <path d="M-42,0 Q-38,-11 -26,-11 L26,-11 Q38,-11 42,0 Q38,11 26,11 L-26,11 Q-38,11 -42,0Z" fill="#2C1810"/>
+      <path d="M-38,-2 Q-28,-9 0,-9 Q22,-9 38,-2" stroke="#5A3020" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.5"/>
+      <line x1="-28" y1="-12" x2="-22" y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.55"/>
+      <line x1="-15" y1="-12" x2="-9"  y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.55"/>
+      <line x1="-2"  y1="-12" x2="4"   y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.55"/>
+      <line x1="11"  y1="-12" x2="17"  y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.55"/>
+      <line x1="24"  y1="-12" x2="30"  y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.55"/>
+    </g>
+  </svg>
+);
+
 const MONTREAL_NEIGHBORHOODS = [
   "Ahuntsic", "Anjou", "Cartierville", "Côte-des-Neiges", "Griffintown",
   "Hochelaga-Maisonneuve", "Lachine", "LaSalle", "Maisonneuve", "Mercier",
@@ -544,11 +561,17 @@ function Modal({ title, onClose, children, maxWidth = 480 }) {
       <div style={{ background: T.bg, borderRadius: 20, width: "100%", maxWidth, boxShadow: "0 24px 64px rgba(44,24,16,0.35)", overflow: "hidden" }}>
         <div style={{ background: T.dark, padding: "20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, fontWeight: 700, color: "#FAF3E4", lineHeight: 1.2 }}>{title}</h3>
+<<<<<<< HEAD
           <button onClick={onClose} style={{ background: "#ffffff15", border: "none", width: 32, height: 32, borderRadius: 8, color: "#FAF3E490", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, flexShrink: 0 }}>×</button>
         </div>
         <div style={{ padding: "28px 28px 24px" }}>
           {children}
         </div>
+=======
+          <button onClick={onClose} style={{ background: "#ffffff15", border: "none", width: 32, height: 32, borderRadius: 8, color: "#FAF3E490", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+        </div>
+        <div style={{ padding: "28px 28px 24px" }}>{children}</div>
+>>>>>>> 1e79e60 (some frontend improvments)
       </div>
     </div>
   );
@@ -570,7 +593,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }) {
 
 function Toast({ msg, type }) {
   return (
-    <div style={{ position: "fixed", top: 76, right: 20, zIndex: 400, background: type === "success" ? T.success : T.danger, color: "#FAF3E4", padding: "12px 20px", borderRadius: 10, fontSize: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.25)" }}>
+    <div style={{ position: "fixed", top: 82, right: 20, zIndex: 400, background: type === "success" ? T.success : T.danger, color: "#FAF3E4", padding: "12px 20px", borderRadius: 10, fontSize: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.25)" }}>
       {msg}
     </div>
   );
@@ -734,25 +757,45 @@ function ProductRankingView({ forcedPtId }) {
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))", gap: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {productRanking.map(({ bakery, aggregated_scores, overall_average, rating_count }, i) => (
-              <div key={bakery.id} style={{ background: "white", borderRadius: 16, overflow: "hidden", border: `2px solid ${i === 0 ? T.gold : T.border}`, boxShadow: i === 0 ? `0 4px 20px ${T.gold}33` : "0 2px 10px rgba(0,0,0,0.06)" }}>
-                <div style={{ background: T.dark, padding: "16px 20px", color: "#FAF3E4" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div>
-                      <div style={{ fontSize: 20, marginBottom: 2 }}>{medals[i] ?? `#${i + 1}`}</div>
-                      <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 17, fontWeight: 700 }}>{bakery.name}</div>
-                      {bakery.neighborhood && <div style={{ fontSize: 12, color: "#FAF3E480", marginTop: 2 }}>{bakery.neighborhood}</div>}
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 30, fontWeight: 700, color: T.gold, lineHeight: 1 }}>{overall_average.toFixed(1)}</div>
-                      <div style={{ fontSize: 11, color: "#FAF3E455" }}>{rating_count} avis</div>
-                    </div>
-                  </div>
+              <div key={bakery.id} style={{
+                background: "white",
+                borderRadius: i === 0 ? "14px 14px 0 0" : i === productRanking.length - 1 ? "0 0 14px 14px" : 0,
+                padding: "18px 22px",
+                borderLeft: `2px solid ${i === 0 ? T.gold : T.border}`,
+                borderRight: `2px solid ${i === 0 ? T.gold : T.border}`,
+                borderTop: `${i === 0 ? 2 : 1}px solid ${i === 0 ? T.gold : T.border}`,
+                borderBottom: i === productRanking.length - 1 ? `2px solid ${T.border}` : `1px solid #F0E8D5`,
+                display: "flex", alignItems: "center", gap: 18,
+              }}>
+                <div style={{ minWidth: 44, textAlign: "center" }}>
+                  {i < 3
+                    ? <span style={{ fontSize: 26 }}>{medals[i]}</span>
+                    : <span style={{ fontSize: 18, fontFamily: '"Playfair Display", serif', color: T.muted, fontWeight: 700 }}>#{i + 1}</span>
+                  }
                 </div>
-                <div style={{ padding: "16px 20px" }}>
-                  {pt?.criteria.map((c) => <ScoreBar key={c.id} label={c.name} score={aggregated_scores[c.name] ?? 0} />)}
-                  <button onClick={() => setRatingTarget(bakery)} style={{ ...css.btnSm, marginTop: 14, width: "100%" }}>★ Donner mon avis</button>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.dark, fontWeight: 700 }}>{bakery.name}</div>
+                  {bakery.neighborhood && <div style={{ fontSize: 13, color: T.muted, marginTop: 2 }}>{bakery.neighborhood}</div>}
+                  {pt && (
+                    <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "4px 16px" }}>
+                      {pt.criteria.map((c) => (
+                        <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 12, color: "#4A3020", whiteSpace: "nowrap", minWidth: 90 }}>{c.name}</span>
+                          <div style={{ flex: 1, background: "#F0E8D5", borderRadius: 99, height: 5, overflow: "hidden" }}>
+                            <div style={{ width: `${(aggregated_scores[c.name] ?? 0) * 20}%`, height: "100%", background: `linear-gradient(90deg, ${T.gold}, #E8B84B)`, borderRadius: 99 }} />
+                          </div>
+                          <span style={{ fontSize: 11, color: T.gold, fontWeight: 600, minWidth: 28 }}>{(aggregated_scores[c.name] ?? 0).toFixed(1)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>{overall_average.toFixed(1)}</div>
+                  <div style={{ fontSize: 11, color: T.muted, marginBottom: 8 }}>{rating_count} avis</div>
+                  <button onClick={() => setRatingTarget(bakery)} style={css.btnSm}>★ Évaluer</button>
                 </div>
               </div>
             ))}
@@ -801,9 +844,18 @@ function OverallRankingView() {
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
         {overallRanking.map(({ bakery, overall_average, total_ratings, product_averages }, i) => (
-          <div key={bakery.id} style={{ background: "white", borderRadius: 14, padding: "18px 22px", border: `2px solid ${i === 0 ? T.gold : T.border}`, display: "flex", alignItems: "center", gap: 18 }}>
+          <div key={bakery.id} style={{
+            background: "white",
+            borderRadius: i === 0 ? "14px 14px 0 0" : i === overallRanking.length - 1 ? "0 0 14px 14px" : 0,
+            padding: "18px 22px",
+            borderLeft: `2px solid ${i === 0 ? T.gold : T.border}`,
+            borderRight: `2px solid ${i === 0 ? T.gold : T.border}`,
+            borderTop: `${i === 0 ? 2 : 1}px solid ${i === 0 ? T.gold : T.border}`,
+            borderBottom: i === overallRanking.length - 1 ? `2px solid ${T.border}` : `1px solid #F0E8D5`,
+            display: "flex", alignItems: "center", gap: 18,
+          }}>
             <div style={{ fontSize: 24, minWidth: 36, textAlign: "center" }}>{medals[i] ?? `#${i + 1}`}</div>
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
@@ -1369,7 +1421,7 @@ function Footer() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function HomeView({ onNavigate, onShowAuth }) {
-  const { bakeries, productTypes, user } = useApp();
+  const { bakeries, productTypes, user, isMobile } = useApp();
   const {
     overallRanking, loadingOverall, fetchOverallRanking,
     productRanking, loadingProduct, fetchProductRanking,
@@ -1392,37 +1444,58 @@ function HomeView({ onNavigate, onShowAuth }) {
   const totalAvis = overallRanking.reduce((a, b) => a + b.total_ratings, 0);
 
   return (
-    <div>
-      {/* ── Hero ─────────────────────────────────────────── */}
-      <div style={{ background: `linear-gradient(135deg, ${T.dark} 0%, #3D1F0D 60%, #5C3020 100%)`, padding: "88px 32px 72px", textAlign: "center", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: -10, left: "5%",  fontSize: 160, opacity: 0.04, transform: "rotate(-20deg)", lineHeight: 1 }}>🥖</div>
-        <div style={{ position: "absolute", bottom: -20, right: "8%", fontSize: 180, opacity: 0.03, transform: "rotate(15deg)", lineHeight: 1 }}>🥐</div>
-        <div style={{ position: "relative", zIndex: 1, maxWidth: 640, margin: "0 auto" }}>
-          <div style={{ display: "inline-block", background: `${T.gold}22`, border: `1px solid ${T.gold}44`, color: T.gold, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", padding: "6px 16px", borderRadius: 20, marginBottom: 22 }}>
-            Boulangeries artisanales · Montréal
+    <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "16px" : "32px" }}>
+
+      {/* ── Hero card deux colonnes ───────────────────────── */}
+      <div style={{ background: `linear-gradient(135deg, ${T.dark}, #4A2A18)`, borderRadius: 20, padding: isMobile ? "32px 24px" : "48px 40px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, flexWrap: "wrap", overflow: "hidden", position: "relative" }}>
+        {/* Cercles décoratifs */}
+        <div style={{ position: "absolute", right: -60, top: -60, width: 260, height: 260, borderRadius: "50%", border: `1px solid ${T.gold}22`, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", right: -30, top: -30, width: 180, height: 180, borderRadius: "50%", border: `1px solid ${T.gold}15`, pointerEvents: "none" }} />
+
+        {/* Colonne texte */}
+        <div style={{ flex: "1 1 300px" }}>
+          <div style={{ fontSize: 11, color: T.gold, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 12 }}>
+            Montréal · Guide artisanal
           </div>
-          <h1 style={{ fontFamily: '"Playfair Display", serif', fontSize: "clamp(36px, 6vw, 60px)", fontWeight: 900, color: "#FAF3E4", lineHeight: 1.1, marginBottom: 18 }}>
-            Les meilleures<br />boulangeries de<br />
-            <span style={{ color: T.gold }}>Montréal</span>
+          <h1 style={{ fontFamily: '"Playfair Display", serif', fontSize: "clamp(26px, 4vw, 38px)", fontWeight: 900, color: "#FAF3E4", lineHeight: 1.15, marginBottom: 14 }}>
+            Les meilleures<br />boulangeries<br /><span style={{ color: T.gold }}>de Montréal</span>
           </h1>
-          <p style={{ fontSize: 17, color: "#FAF3E499", fontStyle: "italic", marginBottom: 38, lineHeight: 1.7 }}>
-            Découvrez, évaluez et partagez vos coups de cœur<br />parmi les artisans boulangers de la métropole.
+          <p style={{ fontSize: 15, color: "#FAF3E4BB", lineHeight: 1.6, marginBottom: 28, maxWidth: 420 }}>
+            Découvrez, évaluez et partagez vos coups de cœur parmi les artisans boulangers de la métropole.
           </p>
-          <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-            <button onClick={() => onNavigate("rankings")}
-              style={{ background: T.gold, color: "white", border: "none", padding: "14px 30px", borderRadius: 10, fontSize: 15, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, boxShadow: `0 4px 20px ${T.gold}55` }}>
-              🏆 Voir le classement
-            </button>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <button onClick={() => onNavigate("bakeries")}
-              style={{ background: "transparent", color: "#FAF3E4", border: "2px solid #FFFFFF30", padding: "14px 30px", borderRadius: 10, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>
-              🏪 Explorer
+              style={{ ...css.btnGold, width: "auto", padding: "12px 28px", fontSize: 15 }}>
+              🏪 Explorer les boulangeries
+            </button>
+            <button onClick={() => onNavigate("rankings")}
+              style={{ background: "#ffffff15", border: "1px solid #ffffff30", color: "#FAF3E4", padding: "12px 24px", borderRadius: 10, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>
+              🏆 Voir les classements
             </button>
           </div>
         </div>
+
+        {/* Mini podium top 3 */}
+        {!isMobile && top3.length > 0 && (
+          <div style={{ flex: "0 1 280px", display: "flex", flexDirection: "column", gap: 10 }}>
+            {top3.map(({ bakery, overall_average, total_ratings }, i) => (
+              <div key={bakery.id}
+                onClick={() => onNavigate("rankings")}
+                style={{ background: i === 0 ? `${T.gold}22` : "#ffffff0a", border: `1px solid ${i === 0 ? T.gold + "55" : "#ffffff15"}`, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                <span style={{ fontSize: i === 0 ? 24 : 20 }}>{medals[i]}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: '"Playfair Display", serif', fontSize: i === 0 ? 15 : 13, fontWeight: 700, color: "#FAF3E4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{bakery.name}</div>
+                  <div style={{ fontSize: 11, color: "#FAF3E460", marginTop: 1 }}>{bakery.neighborhood} · {total_ratings} avis</div>
+                </div>
+                <div style={{ fontSize: i === 0 ? 22 : 18, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>{overall_average.toFixed(1)}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Stats ────────────────────────────────────────── */}
-      <div style={{ background: T.gold, padding: "22px 32px", display: "flex", justifyContent: "center", gap: "clamp(24px, 6vw, 72px)", flexWrap: "wrap" }}>
+      <div style={{ background: `linear-gradient(135deg, ${T.gold}, #E8B84B)`, borderRadius: 14, padding: "20px 28px", display: "flex", justifyContent: "center", gap: "clamp(24px, 6vw, 72px)", flexWrap: "wrap", marginBottom: 48, boxShadow: "0 4px 16px rgba(200,145,42,0.25)" }}>
         {[
           ["🏪", bakeries.length,      "boulangeries"],
           ["🥖", productTypes.length,  "produits notés"],
@@ -1431,14 +1504,13 @@ function HomeView({ onNavigate, onShowAuth }) {
           <div key={label} style={{ textAlign: "center", color: "white" }}>
             <div style={{ fontSize: 22 }}>{icon}</div>
             <div style={{ fontSize: 30, fontWeight: 700, fontFamily: '"Playfair Display", serif', lineHeight: 1.1 }}>{num}</div>
-            <div style={{ fontSize: 12, opacity: 0.82, marginTop: 2 }}>{label}</div>
+            <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>{label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "56px 32px" }}>
-
-        {/* ── Top boulangeries ─────────────────────────── */}
+      {/* ── Top boulangeries ─────────────────────────── */}
+      <div>
         {!loadingOverall && top3.length > 0 && (
           <section style={{ marginBottom: 64 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 28 }}>
@@ -1733,6 +1805,7 @@ function Shell() {
       `}</style>
 
       {/* ── Header ── */}
+<<<<<<< HEAD
       <header style={{ background: T.bg, padding: isMobile ? "8px 12px" : "10px 24px", position: "sticky", top: 0, zIndex: 150 }}>
         <div style={{ background: T.dark, borderRadius: 18, padding: isMobile ? "8px 12px" : "8px 8px 8px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 4px 24px rgba(44,24,16,0.18)", maxWidth: 1080, margin: "0 auto" }}>
         <button onClick={() => setView("home")} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", color: "#FAF3E4", cursor: "pointer", padding: 0 }}>
@@ -1781,7 +1854,45 @@ function Shell() {
               <button onClick={() => setShowAuth(true)} style={{ background: T.gold, border: "none", color: "white", padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
                 {isMobile ? "Connexion" : "Se connecter"}
               </button>
+=======
+      <header style={{ background: T.bg, padding: isMobile ? "8px 16px" : "10px 24px", position: "sticky", top: 0, zIndex: 150 }}>
+        <div style={{ background: T.dark, borderRadius: 18, padding: isMobile ? "8px 12px" : "8px 8px 8px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 4px 24px rgba(44,24,16,0.18)", maxWidth: 1080, margin: "0 auto" }}>
+          <button onClick={() => setView("home")} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", color: "#FAF3E4", cursor: "pointer", padding: 0 }}>
+            <LogoSVG size={isMobile ? 36 : 44} />
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 16 : 18, fontWeight: 900, lineHeight: 1.15, color: "#FAF3E4" }}>Loafly</div>
+              {!isMobile && <div style={{ fontSize: 11, color: `${T.gold}99` }}>Boulangeries artisanales · Montréal</div>}
+            </div>
+          </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* Nav desktop uniquement */}
+            {!isMobile && (
+              <nav style={{ display: "flex", alignItems: "center", gap: 4, background: "#ffffff0f", borderRadius: 12, padding: 4 }}>
+                {VIEWS.map(({ id, icon, label }) => (
+                  <button key={id} onClick={() => setView(id)}
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "none", borderRadius: 9, background: view === id ? T.gold : "transparent", color: view === id ? "white" : "#FAF3E460", fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>
+                    <span style={{ fontSize: 14 }}>{icon}</span>{label}
+                  </button>
+                ))}
+              </nav>
+>>>>>>> 1e79e60 (some frontend improvments)
             )}
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: isMobile ? 0 : 8 }}>
+              {user ? (
+                <>
+                  {!isMobile && <span style={{ fontSize: 13, color: T.gold }}>@{user.username}</span>}
+                  <button onClick={logout} style={{ background: "none", border: "1px solid #FFFFFF30", color: "#FAF3E470", padding: "5px 10px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>
+                    {isMobile ? "↪" : "Déconnexion"}
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => setShowAuth(true)} style={{ background: T.gold, border: "none", color: "white", padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                  {isMobile ? "Connexion" : "Se connecter"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
         </div>
