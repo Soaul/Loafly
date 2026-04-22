@@ -1,0 +1,1015 @@
+/**
+ * Boulangeries MTL — Frontend React (v4 — Flask API)
+ *
+ * Changement majeur vs v3 :
+ *   window.storage  →  fetch() vers l'API Flask
+ *
+ * Architecture de la couche données :
+ *
+ *   ApiClient           — fetch wrapper : base URL, headers, gestion erreurs
+ *   AppContext           — état global : productTypes, bakeries, adminPin, loading
+ *   useAdminAuth()      — login/logout, changement PIN
+ *   useProductTypes()   — CRUD produits via API
+ *   useBakeries()       — CRUD boulangeries via API
+ *   useRatings()        — soumission avis + agrégation locale pour affichage
+ *   useRankings()       — classements depuis /api/rankings/*  ← nouveau hook
+ *
+ * Variable d'environnement :
+ *   VITE_API_URL=http://localhost:5000/api
+ */
+
+import { useState, useEffect, useCallback, useContext, createContext, useMemo } from "react";
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ApiClient  —  src/api/client.js
+//  Un seul endroit pour tous les appels fetch. Jamais de fetch() en dehors.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const API_BASE =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
+  "http://localhost:5000/api";
+
+class ApiError extends Error {
+  constructor(message, code, status) {
+    super(message);
+    this.code   = code;
+    this.status = status;
+  }
+}
+
+async function apiFetch(path, options = {}, adminPin = null) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...(adminPin ? { "X-Admin-Pin": adminPin } : {}),
+    ...options.headers,
+  };
+
+  const res  = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const body = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new ApiError(body.error ?? "Erreur réseau", body.code, res.status);
+  }
+  return body.data ?? body;
+}
+
+const ApiClient = {
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  auth: {
+    verify: (pin) =>
+      apiFetch("/auth/verify", { method: "POST", body: JSON.stringify({ pin }) }),
+    changePin: (newPin, adminPin) =>
+      apiFetch("/auth/pin", { method: "PUT", body: JSON.stringify({ new_pin: newPin }) }, adminPin),
+  },
+
+  // ── Product types ─────────────────────────────────────────────────────────
+  productTypes: {
+    list: () =>
+      apiFetch("/product-types/"),
+    create: (name, emoji, adminPin) =>
+      apiFetch("/product-types/", { method: "POST", body: JSON.stringify({ name, emoji }) }, adminPin),
+    remove: (id, adminPin) =>
+      apiFetch(`/product-types/${id}`, { method: "DELETE" }, adminPin),
+    addCriterion: (ptId, name, adminPin) =>
+      apiFetch(`/product-types/${ptId}/criteria`, { method: "POST", body: JSON.stringify({ name }) }, adminPin),
+    removeCriterion: (ptId, critId, adminPin) =>
+      apiFetch(`/product-types/${ptId}/criteria/${critId}`, { method: "DELETE" }, adminPin),
+  },
+
+  // ── Bakeries ──────────────────────────────────────────────────────────────
+  bakeries: {
+    list: () =>
+      apiFetch("/bakeries/"),
+    get: (id) =>
+      apiFetch(`/bakeries/${id}`),
+    create: (payload, adminPin) =>
+      apiFetch("/bakeries/", { method: "POST", body: JSON.stringify(payload) }, adminPin),
+    remove: (id, adminPin) =>
+      apiFetch(`/bakeries/${id}`, { method: "DELETE" }, adminPin),
+  },
+
+  // ── Ratings ───────────────────────────────────────────────────────────────
+  ratings: {
+    submit: (payload) =>
+      apiFetch("/ratings", { method: "POST", body: JSON.stringify(payload) }),
+  },
+
+  // ── Rankings ──────────────────────────────────────────────────────────────
+  rankings: {
+    byProduct: (productTypeId) =>
+      apiFetch(`/rankings/product/${productTypeId}`),
+    overall: () =>
+      apiFetch("/rankings/overall"),
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  AppContext  —  store/AppContext.jsx
+//  État global minimal : listes + adminPin (session-only)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AppContext = createContext(null);
+
+function AppProvider({ children }) {
+  const [productTypes, setProductTypes] = useState([]);
+  const [bakeries,     setBakeries]     = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [adminPin,     setAdminPin]     = useState(null); // null = non connecté
+  const [toast,        setToast]        = useState(null);
+  const [confirm,      setConfirm]      = useState(null);
+
+  // Chargement initial des données de référence
+  const fetchBaseData = useCallback(async () => {
+    try {
+      const [pts, baks] = await Promise.all([
+        ApiClient.productTypes.list(),
+        ApiClient.bakeries.list(),
+      ]);
+      setProductTypes(Array.isArray(pts) ? pts : []);
+      setBakeries(Array.isArray(baks) ? baks : []);
+    } catch (e) {
+      console.error("[AppContext] fetchBaseData error:", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBaseData().finally(() => setLoading(false));
+  }, [fetchBaseData]);
+
+  const refresh = useCallback(() => fetchBaseData(), [fetchBaseData]);
+
+  const notify = useCallback((msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  const requestConfirm = useCallback((message, onConfirm) =>
+    setConfirm({ message, onConfirm }), []);
+
+  const dismissConfirm = useCallback(() => setConfirm(null), []);
+
+  const isAdmin = adminPin !== null;
+
+  const value = {
+    productTypes, bakeries, loading,
+    adminPin, isAdmin, setAdminPin,
+    refresh, notify, requestConfirm,
+  };
+
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+      {toast   && <Toast {...toast} />}
+      {confirm && (
+        <ConfirmDialog
+          message={confirm.message}
+          onConfirm={() => { confirm.onConfirm(); dismissConfirm(); }}
+          onCancel={dismissConfirm}
+        />
+      )}
+    </AppContext.Provider>
+  );
+}
+
+const useApp = () => {
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error("useApp doit être dans <AppProvider>");
+  return ctx;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  hooks/useAdminAuth.js
+// ─────────────────────────────────────────────────────────────────────────────
+
+function useAdminAuth() {
+  const { adminPin, isAdmin, setAdminPin, notify } = useApp();
+
+  const login = useCallback(async (pin) => {
+    try {
+      const res = await ApiClient.auth.verify(pin);
+      if (res.valid) { setAdminPin(pin); return true; }
+      notify("PIN incorrect", "error");
+      return false;
+    } catch (e) {
+      notify(e.message, "error");
+      return false;
+    }
+  }, [setAdminPin, notify]);
+
+  const logout = useCallback(() => setAdminPin(null), [setAdminPin]);
+
+  const changePin = useCallback(async (newPin) => {
+    if (!adminPin) { notify("Non connecté", "error"); return false; }
+    try {
+      await ApiClient.auth.changePin(newPin, adminPin);
+      notify("PIN modifié !");
+      setAdminPin(newPin); // Mettre à jour le PIN en mémoire
+      return true;
+    } catch (e) {
+      notify(e.message, "error");
+      return false;
+    }
+  }, [adminPin, setAdminPin, notify]);
+
+  return { isAdmin, login, logout, changePin };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  hooks/useProductTypes.js
+// ─────────────────────────────────────────────────────────────────────────────
+
+function useProductTypes() {
+  const { productTypes, adminPin, isAdmin, refresh, notify, requestConfirm } = useApp();
+
+  const guard = (fn) => async (...args) => {
+    if (!isAdmin) { notify("Action réservée à l'admin", "error"); return null; }
+    return fn(...args);
+  };
+
+  const addProductType = guard(async (name, emoji) => {
+    try {
+      const pt = await ApiClient.productTypes.create(name, emoji, adminPin);
+      await refresh();
+      notify("Produit créé !");
+      return pt;
+    } catch (e) { notify(e.message, "error"); return null; }
+  });
+
+  const removeProductType = guard((ptId) => {
+    requestConfirm("Supprimer ce produit et tous ses avis ?", async () => {
+      try {
+        await ApiClient.productTypes.remove(ptId, adminPin);
+        await refresh();
+        notify("Produit supprimé");
+      } catch (e) { notify(e.message, "error"); }
+    });
+  });
+
+  const addCriterion = guard(async (ptId, name) => {
+    try {
+      await ApiClient.productTypes.addCriterion(ptId, name, adminPin);
+      await refresh();
+      notify("Critère ajouté !");
+    } catch (e) { notify(e.message, "error"); }
+  });
+
+  const removeCriterion = guard((ptId, critId, critName) => {
+    requestConfirm(
+      `Supprimer le critère "${critName}" ? Les avis existants ne seront pas affectés.`,
+      async () => {
+        try {
+          await ApiClient.productTypes.removeCriterion(ptId, critId, adminPin);
+          await refresh();
+          notify("Critère supprimé");
+        } catch (e) { notify(e.message, "error"); }
+      }
+    );
+  });
+
+  return { productTypes, addProductType, removeProductType, addCriterion, removeCriterion };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  hooks/useBakeries.js
+// ─────────────────────────────────────────────────────────────────────────────
+
+function useBakeries() {
+  const { bakeries, adminPin, isAdmin, refresh, notify, requestConfirm } = useApp();
+
+  const addBakery = useCallback(async (payload) => {
+    if (!isAdmin) { notify("Seul l'admin peut ajouter une boulangerie", "error"); return null; }
+    try {
+      const b = await ApiClient.bakeries.create(payload, adminPin);
+      await refresh();
+      notify("Boulangerie ajoutée !");
+      return b;
+    } catch (e) { notify(e.message, "error"); return null; }
+  }, [adminPin, isAdmin, refresh, notify]);
+
+  const removeBakery = useCallback((bakeryId) => {
+    if (!isAdmin) { notify("Action réservée à l'admin", "error"); return; }
+    requestConfirm("Supprimer cette boulangerie et tous ses avis ?", async () => {
+      try {
+        await ApiClient.bakeries.remove(bakeryId, adminPin);
+        await refresh();
+        notify("Boulangerie supprimée");
+      } catch (e) { notify(e.message, "error"); }
+    });
+  }, [adminPin, isAdmin, refresh, notify, requestConfirm]);
+
+  return { bakeries, addBakery, removeBakery };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  hooks/useRatings.js
+// ─────────────────────────────────────────────────────────────────────────────
+
+function useRatings() {
+  const { notify } = useApp();
+
+  const submitRating = useCallback(async (payload) => {
+    try {
+      await ApiClient.ratings.submit(payload);
+      notify("Avis enregistré, merci !");
+      return true;
+    } catch (e) {
+      notify(e.message, "error");
+      return false;
+    }
+  }, [notify]);
+
+  return { submitRating };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  hooks/useRankings.js   ← nouveau : données viennent de l'API, pas local
+// ─────────────────────────────────────────────────────────────────────────────
+
+function useRankings() {
+  const [productRanking, setProductRanking] = useState([]);
+  const [overallRanking, setOverallRanking] = useState([]);
+  const [loadingProduct, setLoadingProduct] = useState(false);
+  const [loadingOverall, setLoadingOverall] = useState(false);
+  const { notify } = useApp();
+
+  const fetchProductRanking = useCallback(async (productTypeId) => {
+    if (!productTypeId) return;
+    setLoadingProduct(true);
+    try {
+      const data = await ApiClient.rankings.byProduct(productTypeId);
+      setProductRanking(Array.isArray(data) ? data : []);
+    } catch (e) {
+      notify(e.message, "error");
+      setProductRanking([]);
+    } finally {
+      setLoadingProduct(false);
+    }
+  }, [notify]);
+
+  const fetchOverallRanking = useCallback(async () => {
+    setLoadingOverall(true);
+    try {
+      const data = await ApiClient.rankings.overall();
+      setOverallRanking(Array.isArray(data) ? data : []);
+    } catch (e) {
+      notify(e.message, "error");
+      setOverallRanking([]);
+    } finally {
+      setLoadingOverall(false);
+    }
+  }, [notify]);
+
+  return {
+    productRanking, overallRanking,
+    loadingProduct, loadingOverall,
+    fetchProductRanking, fetchOverallRanking,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Design tokens + styles
+// ─────────────────────────────────────────────────────────────────────────────
+
+const T = {
+  bg: "#FAF3E4", dark: "#2C1810", gold: "#C8912A",
+  muted: "#8B6550", border: "#E8D5B5", danger: "#8B2E1C", success: "#2C6E2C",
+};
+
+const css = {
+  input:    { width: "100%", padding: "10px 14px", border: `1.5px solid ${T.border}`, borderRadius: 8, fontSize: 15, background: "white", color: T.dark, fontFamily: "inherit" },
+  btnDark:  { background: T.dark,  color: "#FAF3E4", border: "none", padding: "10px 20px", borderRadius: 8, fontSize: 14, cursor: "pointer", fontFamily: "inherit" },
+  btnGold:  { background: T.gold,  color: "white",   border: "none", padding: "12px 24px", borderRadius: 8, fontSize: 15, cursor: "pointer", width: "100%", fontFamily: "inherit" },
+  btnGhost: { background: "none",  border: `1px solid ${T.border}`, color: T.danger, padding: "10px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontFamily: "inherit" },
+  btnSm:    { background: `${T.gold}22`, color: T.gold, border: `1px solid ${T.gold}55`, padding: "7px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "inherit" },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  UI components (inchangés vs v3 — purement présentationnels)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Stars({ value = 0, onChange, size = 22, readOnly = false }) {
+  const [hover, setHover] = useState(0);
+  const labels = ["", "Très mauvais", "Mauvais", "Correct", "Bon", "Excellent"];
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ display: "flex", gap: 3 }}>
+        {[1,2,3,4,5].map((n) => (
+          <span key={n} onMouseEnter={() => !readOnly && setHover(n)} onMouseLeave={() => !readOnly && setHover(0)}
+            onClick={() => !readOnly && onChange?.(n)} title={labels[n]}
+            style={{ fontSize: size, cursor: readOnly ? "default" : "pointer", color: n <= (hover || value) ? T.gold : T.border, transition: "color 0.1s", lineHeight: 1, userSelect: "none" }}>★</span>
+        ))}
+      </div>
+      {!readOnly && (hover || value) > 0 && (
+        <span style={{ fontSize: 12, color: T.muted, fontStyle: "italic" }}>{labels[hover || value]}</span>
+      )}
+    </div>
+  );
+}
+
+function Modal({ title, onClose, children, maxWidth = 460 }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 200, background: "rgba(28,15,7,0.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "60px 16px 40px" }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: T.bg, borderRadius: 16, padding: 32, width: "100%", maxWidth, boxShadow: "0 8px 40px rgba(0,0,0,0.25)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, color: T.dark }}>{title}</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 26, color: T.muted, cursor: "pointer", lineHeight: 1, padding: 0 }}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDialog({ message, onConfirm, onCancel }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 300, background: "rgba(28,15,7,0.65)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div style={{ background: T.bg, borderRadius: 14, padding: 28, maxWidth: 380, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.3)" }}>
+        <p style={{ fontSize: 16, color: T.dark, marginBottom: 24, lineHeight: 1.5 }}>{message}</p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button onClick={onCancel}  style={{ ...css.btnDark, background: "none", border: `1px solid ${T.border}`, color: T.muted }}>Annuler</button>
+          <button onClick={onConfirm} style={{ ...css.btnDark, background: T.danger }}>Confirmer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Toast({ msg, type }) {
+  return (
+    <div style={{ position: "absolute", top: 76, right: 20, zIndex: 400, background: type === "success" ? T.success : T.danger, color: "#FAF3E4", padding: "12px 20px", borderRadius: 10, fontSize: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.25)" }}>
+      {msg}
+    </div>
+  );
+}
+
+function Field({ label, children, style }) {
+  return (
+    <div style={{ marginBottom: 16, ...style }}>
+      <label style={{ display: "block", fontSize: 12, color: T.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function EmptyState({ emoji = "🥐", text }) {
+  return (
+    <div style={{ textAlign: "center", padding: "60px 20px", color: T.muted }}>
+      <div style={{ fontSize: 44, marginBottom: 14 }}>{emoji}</div>
+      <p style={{ fontStyle: "italic", fontSize: 15 }}>{text}</p>
+    </div>
+  );
+}
+
+function ScoreBar({ label, score }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+        <span style={{ fontSize: 13, color: "#4A3020" }}>{label}</span>
+        <span style={{ fontSize: 12, color: T.gold, fontWeight: 600 }}>{Number(score).toFixed(1)}/5</span>
+      </div>
+      <div style={{ background: "#F0E8D5", borderRadius: 99, height: 6, overflow: "hidden" }}>
+        <div style={{ width: `${score * 20}%`, height: "100%", background: `linear-gradient(90deg, ${T.gold}, #E8B84B)`, borderRadius: 99, transition: "width 0.4s ease" }} />
+      </div>
+    </div>
+  );
+}
+
+function Spinner() {
+  return <div style={{ textAlign: "center", padding: 40, color: T.muted, fontStyle: "italic" }}>Chargement…</div>;
+}
+
+function PinInput({ value, onChange }) {
+  return <input type="password" value={value} onChange={(e) => onChange(e.target.value)} placeholder="• • • •" style={{ ...css.input, letterSpacing: "0.2em", fontSize: 20, textAlign: "center" }} />;
+}
+
+function AdminGate({ children }) {
+  const { isAdmin } = useApp();
+  const { login }   = useAdminAuth();
+  const [pin, setPin] = useState("");
+
+  if (isAdmin) return children;
+
+  return (
+    <div style={{ maxWidth: 360, margin: "80px auto", textAlign: "center" }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+      <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 22, color: T.dark, marginBottom: 8 }}>Accès administrateur</h2>
+      <p style={{ color: T.muted, fontSize: 14, marginBottom: 28, fontStyle: "italic" }}>Entrez votre PIN pour accéder à l'espace admin.</p>
+      <Field label="PIN admin"><PinInput value={pin} onChange={setPin} /></Field>
+      <button onClick={async () => { const ok = await login(pin); if (ok) setPin(""); }} style={{ ...css.btnGold, marginTop: 8 }}>Se connecter</button>
+      <p style={{ fontSize: 12, color: T.muted, marginTop: 16, fontStyle: "italic" }}>PIN par défaut : 1234</p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  views/RankingsView
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AddRatingModal({ bakery, productTypes, defaultPtId, onClose, onSave }) {
+  const [ptId,       setPtId]       = useState(defaultPtId ?? productTypes[0]?.id ?? "");
+  const [scores,     setScores]     = useState({});
+  const [note,       setNote]       = useState("");
+  const [authorName, setAuthorName] = useState("");
+  const pt = productTypes.find((p) => p.id === ptId);
+  return (
+    <Modal title={`Donner mon avis — ${bakery.name}`} onClose={onClose} maxWidth={480}>
+      <Field label="Prénom / pseudo"><input value={authorName} onChange={(e) => setAuthorName(e.target.value)} placeholder="Ex : Marie" style={css.input} /></Field>
+      <Field label="Produit">
+        <select value={ptId} onChange={(e) => { setPtId(e.target.value); setScores({}); }} style={css.input}>
+          {productTypes.map((p) => <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>)}
+        </select>
+      </Field>
+      {pt?.criteria.map((c) => (
+        <Field key={c.id} label={c.name}>
+          <Stars value={scores[c.name] ?? 0} onChange={(v) => setScores((s) => ({ ...s, [c.name]: v }))} />
+        </Field>
+      ))}
+      <Field label="Commentaire (optionnel)">
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Un mot sur votre dégustation…" style={{ ...css.input, resize: "vertical", minHeight: 72 }} />
+      </Field>
+      <button onClick={() => onSave({ product_type_id: ptId, scores, note, author_name: authorName })} style={{ ...css.btnGold, marginTop: 4 }}>Envoyer mon avis</button>
+    </Modal>
+  );
+}
+
+function ProductRankingView() {
+  const { productTypes }                                          = useApp();
+  const { submitRating }                                          = useRatings();
+  const { productRanking, loadingProduct, fetchProductRanking }   = useRankings();
+  const [ptId, setPtId]         = useState(() => productTypes[0]?.id ?? null);
+  const [ratingTarget, setRatingTarget] = useState(null);
+  const medals = ["🥇", "🥈", "🥉"];
+
+  useEffect(() => {
+    if (ptId) fetchProductRanking(ptId);
+  }, [ptId]);
+
+  const handleSave = async (payload) => {
+    const ok = await submitRating({ bakery_id: ratingTarget.id, ...payload });
+    if (ok) { setRatingTarget(null); fetchProductRanking(ptId); }
+  };
+
+  const pt = productTypes.find((p) => p.id === ptId);
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 28 }}>
+        {productTypes.map((p) => (
+          <button key={p.id} onClick={() => setPtId(p.id)}
+            style={{ padding: "9px 18px", border: `2px solid ${ptId === p.id ? T.gold : T.border}`, background: ptId === p.id ? T.gold : "white", color: ptId === p.id ? "white" : T.muted, borderRadius: 30, fontSize: 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s" }}>
+            {p.emoji} {p.name}
+          </button>
+        ))}
+      </div>
+
+      {loadingProduct ? <Spinner /> : productRanking.length === 0 ? (
+        <EmptyState text={pt ? `Aucun avis pour « ${pt.name} » encore.` : "Sélectionnez un produit."} />
+      ) : (
+        <>
+          {productRanking.length >= 2 && (
+            <div style={{ background: `linear-gradient(135deg, ${T.dark}, #4A2A18)`, border: `2px solid ${T.gold}`, color: "#FAF3E4", padding: "18px 24px", borderRadius: 14, marginBottom: 24, display: "flex", alignItems: "center", gap: 18 }}>
+              <span style={{ fontSize: 36 }}>🏆</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, color: T.gold, textTransform: "uppercase", letterSpacing: "0.12em" }}>Meilleure {pt?.name} de Montréal</div>
+                <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 22, fontWeight: 700, marginTop: 2 }}>{productRanking[0].bakery.name}</div>
+                <div style={{ fontSize: 13, color: "#FAF3E4AA", marginTop: 2 }}>
+                  {productRanking[0].overall_average.toFixed(2)} / 5 · {productRanking[0].rating_count} avis · {productRanking[0].bakery.neighborhood || "Montréal"}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))", gap: 20 }}>
+            {productRanking.map(({ bakery, aggregated_scores, overall_average, rating_count }, i) => (
+              <div key={bakery.id} style={{ background: "white", borderRadius: 16, overflow: "hidden", border: `2px solid ${i === 0 ? T.gold : T.border}`, boxShadow: i === 0 ? `0 4px 20px ${T.gold}33` : "0 2px 10px rgba(0,0,0,0.06)" }}>
+                <div style={{ background: T.dark, padding: "16px 20px", color: "#FAF3E4" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: 20, marginBottom: 2 }}>{medals[i] ?? `#${i + 1}`}</div>
+                      <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 17, fontWeight: 700 }}>{bakery.name}</div>
+                      {bakery.neighborhood && <div style={{ fontSize: 12, color: "#FAF3E480", marginTop: 2 }}>{bakery.neighborhood}</div>}
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 30, fontWeight: 700, color: T.gold, lineHeight: 1 }}>{overall_average.toFixed(1)}</div>
+                      <div style={{ fontSize: 11, color: "#FAF3E455" }}>{rating_count} avis</div>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: "16px 20px" }}>
+                  {pt?.criteria.map((c) => <ScoreBar key={c.id} label={c.name} score={aggregated_scores[c.name] ?? 0} />)}
+                  <button onClick={() => setRatingTarget(bakery)} style={{ ...css.btnSm, marginTop: 14, width: "100%" }}>★ Donner mon avis</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {ratingTarget && (
+        <AddRatingModal bakery={ratingTarget} productTypes={productTypes} defaultPtId={ptId} onClose={() => setRatingTarget(null)} onSave={handleSave} />
+      )}
+    </div>
+  );
+}
+
+function OverallRankingView() {
+  const { productTypes }                                      = useApp();
+  const { submitRating }                                      = useRatings();
+  const { overallRanking, loadingOverall, fetchOverallRanking } = useRankings();
+  const [ratingTarget, setRatingTarget] = useState(null);
+  const medals = ["🥇", "🥈", "🥉"];
+
+  useEffect(() => { fetchOverallRanking(); }, []);
+
+  const handleSave = async (payload) => {
+    const ok = await submitRating({ bakery_id: ratingTarget.id, ...payload });
+    if (ok) { setRatingTarget(null); fetchOverallRanking(); }
+  };
+
+  if (loadingOverall) return <Spinner />;
+  if (overallRanking.length === 0) return <EmptyState emoji="🏅" text="Pas encore assez d'avis pour un classement général." />;
+
+  return (
+    <div>
+      {overallRanking.length >= 2 && (
+        <div style={{ background: `linear-gradient(135deg, ${T.dark}, #4A2A18)`, border: `2px solid ${T.gold}`, color: "#FAF3E4", padding: "20px 28px", borderRadius: 14, marginBottom: 28 }}>
+          <div style={{ fontSize: 11, color: T.gold, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>🏆 Meilleure boulangerie de Montréal</div>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+            {overallRanking.slice(0, 3).map(({ bakery, overall_average, product_count, total_ratings }, i) => (
+              <div key={bakery.id} style={{ flex: i === 0 ? "1 1 auto" : "0 1 auto" }}>
+                <div style={{ fontSize: i === 0 ? 28 : 20, marginBottom: 2 }}>{medals[i]}</div>
+                <div style={{ fontFamily: '"Playfair Display", serif', fontSize: i === 0 ? 22 : 17, fontWeight: 700 }}>{bakery.name}</div>
+                <div style={{ fontSize: 13, color: "#FAF3E4BB", marginTop: 2 }}>{overall_average.toFixed(2)} / 5 · {product_count} produit{product_count > 1 ? "s" : ""} · {total_ratings} avis</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {overallRanking.map(({ bakery, overall_average, product_count, total_ratings, product_averages }, i) => (
+          <div key={bakery.id} style={{ background: "white", borderRadius: 14, padding: "18px 22px", border: `2px solid ${i === 0 ? T.gold : T.border}`, display: "flex", alignItems: "center", gap: 18 }}>
+            <div style={{ fontSize: 24, minWidth: 36, textAlign: "center" }}>{medals[i] ?? `#${i + 1}`}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.dark }}>{bakery.name}</span>
+                {bakery.neighborhood && <span style={{ fontSize: 13, color: T.muted }}>{bakery.neighborhood}</span>}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                {product_averages.map(({ product_type, average, rating_count }) => (
+                  <div key={product_type.id} style={{ display: "flex", alignItems: "center", gap: 5, background: T.bg, padding: "4px 10px", borderRadius: 20, fontSize: 13 }}>
+                    <span>{product_type.emoji}</span>
+                    <span style={{ color: T.dark }}>{product_type.name}</span>
+                    <span style={{ color: T.gold, fontWeight: 600 }}>{average.toFixed(1)}</span>
+                    <span style={{ color: T.muted, fontSize: 11 }}>({rating_count})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ textAlign: "right", minWidth: 80 }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: T.gold, lineHeight: 1 }}>{overall_average.toFixed(1)}</div>
+              <div style={{ fontSize: 11, color: T.muted }}>{total_ratings} avis</div>
+              <button onClick={() => setRatingTarget(bakery)} style={{ ...css.btnSm, marginTop: 8 }}>★ Évaluer</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {ratingTarget && (
+        <AddRatingModal bakery={ratingTarget} productTypes={productTypes} onClose={() => setRatingTarget(null)} onSave={handleSave} />
+      )}
+    </div>
+  );
+}
+
+function RankingsView() {
+  const [sub, setSub] = useState("product");
+  const SUB = [["product", "🥖 Par produit"], ["overall", "🏅 Classement général"]];
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 4, background: "white", border: `1px solid ${T.border}`, borderRadius: 10, padding: 4, marginBottom: 28, width: "fit-content" }}>
+        {SUB.map(([id, label]) => (
+          <button key={id} onClick={() => setSub(id)} style={{ padding: "8px 20px", border: "none", borderRadius: 7, background: sub === id ? T.dark : "transparent", color: sub === id ? "#FAF3E4" : T.muted, fontSize: 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>{label}</button>
+        ))}
+      </div>
+      {sub === "product" && <ProductRankingView />}
+      {sub === "overall" && <OverallRankingView />}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  views/BakeriesView
+// ─────────────────────────────────────────────────────────────────────────────
+
+function BakeriesView() {
+  const { productTypes, isAdmin }              = useApp();
+  const { bakeries, addBakery, removeBakery }  = useBakeries();
+  const { submitRating }                       = useRatings();
+
+  const [selectedId,    setSelectedId]    = useState(null);
+  const [bakeryDetail,  setBakeryDetail]  = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [showAddBakery, setShowAddBakery] = useState(false);
+  const [showAddRating, setShowAddRating] = useState(false);
+
+  const selected = bakeries.find((b) => b.id === selectedId);
+
+  // Charger le détail complet (avis inclus) depuis l'API
+  useEffect(() => {
+    if (!selectedId) { setBakeryDetail(null); return; }
+    setLoadingDetail(true);
+    ApiClient.bakeries.get(selectedId)
+      .then(setBakeryDetail)
+      .catch(() => setBakeryDetail(null))
+      .finally(() => setLoadingDetail(false));
+  }, [selectedId]);
+
+  const handleAddBakery = async (payload) => {
+    const created = await addBakery(payload);
+    if (created) { setSelectedId(created.id); setShowAddBakery(false); }
+  };
+
+  const handleAddRating = async (payload) => {
+    const ok = await submitRating({ bakery_id: selectedId, ...payload });
+    if (ok) {
+      setShowAddRating(false);
+      // Recharger le détail
+      const detail = await ApiClient.bakeries.get(selectedId);
+      setBakeryDetail(detail);
+    }
+  };
+
+  const handleDelete = () => {
+    removeBakery(selectedId);
+    setSelectedId(null);
+    setBakeryDetail(null);
+  };
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 28, alignItems: "start" }}>
+      <div>
+        {isAdmin && <button onClick={() => setShowAddBakery(true)} style={{ ...css.btnDark, width: "100%", marginBottom: 16 }}>+ Ajouter une boulangerie</button>}
+        {bakeries.length === 0 && <p style={{ color: T.muted, fontStyle: "italic", fontSize: 14 }}>Aucune boulangerie.</p>}
+        {bakeries.map((b) => (
+          <div key={b.id} onClick={() => setSelectedId(b.id)}
+            style={{ padding: "12px 16px", marginBottom: 8, borderRadius: 10, cursor: "pointer", background: selectedId === b.id ? T.dark : "white", color: selectedId === b.id ? "#FAF3E4" : T.dark, border: `2px solid ${selectedId === b.id ? T.gold : T.border}`, transition: "all 0.2s" }}>
+            <div style={{ fontFamily: '"Playfair Display", serif', fontWeight: 600, fontSize: 15 }}>{b.name}</div>
+            {b.neighborhood && <div style={{ fontSize: 12, opacity: 0.65, marginTop: 2 }}>{b.neighborhood}</div>}
+            <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>{b.rating_count ?? 0} avis</div>
+          </div>
+        ))}
+      </div>
+
+      <div>
+        {!selected ? <EmptyState emoji="🏪" text="Sélectionnez une boulangerie" /> : loadingDetail ? <Spinner /> : bakeryDetail && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+              <div>
+                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 24, color: T.dark }}>{bakeryDetail.name}</h2>
+                {bakeryDetail.neighborhood && <p style={{ color: T.muted, marginTop: 4 }}>{bakeryDetail.neighborhood}</p>}
+                {bakeryDetail.address && <p style={{ color: T.muted, fontSize: 13 }}>{bakeryDetail.address}</p>}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setShowAddRating(true)} style={{ ...css.btnDark, background: T.gold }}>★ Donner mon avis</button>
+                {isAdmin && <button onClick={handleDelete} style={css.btnGhost}>Supprimer</button>}
+              </div>
+            </div>
+
+            {(!bakeryDetail.products || bakeryDetail.products.length === 0) ? (
+              <EmptyState text="Aucun avis pour cette boulangerie." />
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {bakeryDetail.products.map(({ product_type, aggregated_scores, overall_average, rating_count, individual_ratings }) => (
+                  <div key={product_type.id} style={{ background: "white", borderRadius: 14, padding: 22, border: `1px solid ${T.border}` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                      <span style={{ fontFamily: '"Playfair Display", serif', fontSize: 17 }}>{product_type.emoji} {product_type.name}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ background: `${T.gold}22`, color: T.gold, border: `1px solid ${T.gold}55`, padding: "3px 10px", borderRadius: 20, fontSize: 12 }}>{rating_count} avis</span>
+                        <span style={{ background: T.gold, color: "white", padding: "4px 14px", borderRadius: 20, fontSize: 14, fontWeight: 600 }}>⌀ {overall_average.toFixed(2)} / 5</span>
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, marginBottom: 16 }}>
+                      {Object.entries(aggregated_scores).map(([name, score]) => <ScoreBar key={name} label={name} score={score} />)}
+                    </div>
+                    <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 14 }}>
+                      <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Avis individuels</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {individual_ratings.map((r) => (
+                          <div key={r.id} style={{ background: T.bg, borderRadius: 8, padding: "10px 14px", display: "flex", gap: 12 }}>
+                            <div style={{ width: 32, height: 32, borderRadius: "50%", background: T.dark, display: "flex", alignItems: "center", justifyContent: "center", color: T.gold, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                              {(r.author_name || "A")[0].toUpperCase()}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: T.dark }}>{r.author_name}</span>
+                                <span style={{ fontSize: 12, color: T.gold, fontWeight: 600 }}>{(Object.values(r.scores).reduce((a,b) => a+b, 0) / Object.values(r.scores).length).toFixed(1)}/5</span>
+                              </div>
+                              {r.note && <p style={{ fontSize: 13, color: T.muted, fontStyle: "italic", marginTop: 4 }}>« {r.note} »</p>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {showAddBakery && (
+        <Modal title="Ajouter une boulangerie" onClose={() => setShowAddBakery(false)}>
+          {(() => {
+            const [f, setF] = useState({ name: "", neighborhood: "", address: "" });
+            const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
+            return <>
+              <Field label="Nom *"><input value={f.name} onChange={set("name")} placeholder="Ex : Première Moisson" style={css.input} /></Field>
+              <Field label="Quartier"><input value={f.neighborhood} onChange={set("neighborhood")} placeholder="Ex : Plateau-Mont-Royal" style={css.input} /></Field>
+              <Field label="Adresse"><input value={f.address} onChange={set("address")} placeholder="Ex : 1234 rue Saint-Denis" style={css.input} /></Field>
+              <button onClick={() => handleAddBakery(f)} style={{ ...css.btnGold, marginTop: 8 }}>Ajouter</button>
+            </>;
+          })()}
+        </Modal>
+      )}
+      {showAddRating && selected && (
+        <AddRatingModal bakery={selected} productTypes={productTypes} onClose={() => setShowAddRating(false)} onSave={handleAddRating} />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  views/AdminView
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AdminView() {
+  const { productTypes }                                                                   = useApp();
+  const { addProductType, removeProductType, addCriterion, removeCriterion }              = useProductTypes();
+  const { isAdmin, logout, changePin }                                                    = useAdminAuth();
+
+  const [selectedPtId, setSelectedPtId] = useState(() => productTypes[0]?.id ?? null);
+  const [tab,          setTab]          = useState("products");
+  const [showAddPt,    setShowAddPt]    = useState(false);
+  const [newPt,        setNewPt]        = useState({ name: "", emoji: "🍞" });
+  const [newCrit,      setNewCrit]      = useState("");
+  const [pinForm,      setPinForm]      = useState({ next: "", confirm: "" });
+
+  useEffect(() => {
+    if (!selectedPtId && productTypes.length > 0) setSelectedPtId(productTypes[0].id);
+  }, [productTypes]);
+
+  const handleAddPt = async () => {
+    const created = await addProductType(newPt.name, newPt.emoji);
+    if (created) { setSelectedPtId(created.id); setShowAddPt(false); setNewPt({ name: "", emoji: "🍞" }); }
+  };
+
+  const selectedPt = productTypes.find((p) => p.id === selectedPtId);
+
+  return (
+    <AdminGate>
+      <div>
+        <div style={{ display: "flex", gap: 4, background: "white", border: `1px solid ${T.border}`, borderRadius: 10, padding: 4, marginBottom: 28, width: "fit-content" }}>
+          {[["products", "📦 Produits & critères"], ["security", "🔑 Sécurité"]].map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)} style={{ padding: "8px 20px", border: "none", borderRadius: 7, background: tab === id ? T.dark : "transparent", color: tab === id ? "#FAF3E4" : T.muted, fontSize: 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>{label}</button>
+          ))}
+        </div>
+
+        {tab === "security" && (
+          <div style={{ background: "white", borderRadius: 14, padding: 26, border: `1px solid ${T.border}`, maxWidth: 380 }}>
+            <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.dark, marginBottom: 20 }}>🔑 Changer le PIN</div>
+            <Field label="Nouveau PIN"><PinInput value={pinForm.next} onChange={(v) => setPinForm((p) => ({ ...p, next: v }))} /></Field>
+            <Field label="Confirmer"><PinInput value={pinForm.confirm} onChange={(v) => setPinForm((p) => ({ ...p, confirm: v }))} /></Field>
+            {pinForm.next && pinForm.confirm && pinForm.next !== pinForm.confirm && (
+              <p style={{ color: T.danger, fontSize: 13, marginBottom: 12 }}>Les PINs ne correspondent pas.</p>
+            )}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={async () => { if (pinForm.next === pinForm.confirm) { const ok = await changePin(pinForm.next); if (ok) setPinForm({ next: "", confirm: "" }); } }} style={{ ...css.btnGold, flex: 1, width: "auto" }}>Modifier</button>
+              <button onClick={logout} style={{ ...css.btnGhost, color: T.muted }}>Déconnexion</button>
+            </div>
+          </div>
+        )}
+
+        {tab === "products" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 22, color: T.dark }}>Produits & critères</h2>
+              <button onClick={() => setShowAddPt(true)} style={css.btnDark}>+ Nouveau produit</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 24, alignItems: "start" }}>
+              <div>
+                {productTypes.map((pt) => (
+                  <div key={pt.id} onClick={() => setSelectedPtId(pt.id)}
+                    style={{ padding: "12px 16px", marginBottom: 8, borderRadius: 10, cursor: "pointer", background: selectedPtId === pt.id ? T.dark : "white", color: selectedPtId === pt.id ? "#FAF3E4" : T.dark, border: `2px solid ${selectedPtId === pt.id ? T.gold : T.border}`, transition: "all 0.2s", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>{pt.emoji} {pt.name}</span>
+                    <span style={{ fontSize: 12, opacity: 0.6 }}>{pt.criteria.length} critères</span>
+                  </div>
+                ))}
+              </div>
+              {selectedPt ? (
+                <div style={{ background: "white", borderRadius: 14, padding: 26, border: `1px solid ${T.border}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+                    <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, color: T.dark }}>{selectedPt.emoji} {selectedPt.name}</div>
+                    <button onClick={() => removeProductType(selectedPt.id)} style={css.btnGhost}>Supprimer</button>
+                  </div>
+                  <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Critères</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+                    {selectedPt.criteria.map((c) => (
+                      <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, background: T.bg, padding: "7px 14px", borderRadius: 30, border: `1px solid ${T.border}` }}>
+                        <span style={{ fontSize: 14, color: T.dark }}>{c.name}</span>
+                        <button onClick={() => removeCriterion(selectedPt.id, c.id, c.name)} style={{ background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <input value={newCrit} onChange={(e) => setNewCrit(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { addCriterion(selectedPt.id, newCrit); setNewCrit(""); } }} placeholder="Nouveau critère…" style={{ ...css.input, flex: 1 }} />
+                    <button onClick={() => { addCriterion(selectedPt.id, newCrit); setNewCrit(""); }} style={css.btnDark}>Ajouter</button>
+                  </div>
+                </div>
+              ) : <EmptyState text="Sélectionnez un produit" />}
+            </div>
+          </>
+        )}
+
+        {showAddPt && (
+          <Modal title="Nouveau produit" onClose={() => setShowAddPt(false)}>
+            <div style={{ display: "flex", gap: 12 }}>
+              <Field label="Emoji" style={{ width: 90 }}><input value={newPt.emoji} onChange={(e) => setNewPt((p) => ({ ...p, emoji: e.target.value }))} style={{ ...css.input, textAlign: "center", fontSize: 22 }} /></Field>
+              <Field label="Nom *" style={{ flex: 1 }}><input value={newPt.name} onChange={(e) => setNewPt((p) => ({ ...p, name: e.target.value }))} placeholder="Ex : Pain de campagne" style={css.input} /></Field>
+            </div>
+            <button onClick={handleAddPt} style={css.btnGold}>Créer</button>
+          </Modal>
+        )}
+      </div>
+    </AdminGate>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  App.jsx
+// ─────────────────────────────────────────────────────────────────────────────
+
+const VIEWS = [
+  { id: "rankings",  icon: "🏆", label: "Classements" },
+  { id: "bakeries",  icon: "🏪", label: "Boulangeries" },
+  { id: "admin",     icon: "⚙️", label: "Admin" },
+];
+
+function Shell() {
+  const { loading, isAdmin } = useApp();
+  const [view, setView]      = useState("rankings");
+
+  if (loading) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "Georgia, serif", color: T.muted, background: T.bg }}>
+      Connexion à l'API…
+    </div>
+  );
+
+  return (
+    <div style={{ fontFamily: '"EB Garamond", Georgia, serif', background: T.bg, minHeight: "100vh", color: T.dark, position: "relative" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        input, textarea, select, button { font-family: inherit; }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: ${T.gold} !important; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-thumb { background: ${T.gold}; border-radius: 4px; }
+      `}</style>
+
+      <header style={{ background: T.dark, color: "#FAF3E4", padding: "0 32px", display: "flex", alignItems: "stretch", justifyContent: "space-between", height: 64 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <span style={{ fontSize: 26 }}>🥖</span>
+          <div>
+            <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, fontWeight: 900, lineHeight: 1.1 }}>Boulangeries Montréal</div>
+            <div style={{ fontSize: 11, color: T.gold, fontStyle: "italic" }}>Guide de dégustation artisanale</div>
+          </div>
+        </div>
+        <nav style={{ display: "flex", alignItems: "stretch", gap: 2 }}>
+          {VIEWS.map(({ id, icon, label }) => (
+            <button key={id} onClick={() => setView(id)}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 18px", border: "none", background: view === id ? `${T.gold}22` : "transparent", color: view === id ? T.gold : "#FAF3E470", borderBottom: `2px solid ${view === id ? T.gold : "transparent"}`, fontSize: 14, cursor: "pointer", transition: "all 0.18s", position: "relative" }}>
+              <span style={{ fontSize: 15 }}>{icon}</span> {label}
+              {id === "admin" && isAdmin && <span style={{ position: "absolute", top: 14, right: 8, width: 7, height: 7, borderRadius: "50%", background: "#2C6E2C" }} />}
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      <main style={{ padding: "32px", maxWidth: 1080, margin: "0 auto" }}>
+        {view === "rankings" && <RankingsView />}
+        {view === "bakeries" && <BakeriesView />}
+        {view === "admin"    && <AdminView />}
+      </main>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AppProvider>
+      <Shell />
+    </AppProvider>
+  );
+}

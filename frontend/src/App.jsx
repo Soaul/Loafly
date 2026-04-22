@@ -725,15 +725,6 @@ function ProductRankingView({ forcedPtId }) {
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 28 }}>
-        {productTypes.map((p) => (
-          <button key={p.id} onClick={() => setPtId(p.id)}
-            style={{ padding: "9px 18px", border: `2px solid ${ptId === p.id ? T.gold : T.border}`, background: ptId === p.id ? T.gold : "white", color: ptId === p.id ? "white" : T.muted, borderRadius: 30, fontSize: 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s" }}>
-            {p.emoji} {p.name}
-          </button>
-        ))}
-      </div>
-
       {loadingProduct ? <Spinner /> : productRanking.length === 0 ? (
         <EmptyState text={pt ? `Aucun avis pour « ${pt.name} » encore.` : "Sélectionnez un produit."} />
       ) : (
