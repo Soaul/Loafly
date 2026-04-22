@@ -7,7 +7,7 @@ routes/bakeries.py
     DELETE /api/bakeries/<id>     → supprimer [admin]
 """
 
-from flask import Blueprint, request
+from flask import Blueprint, request, g
 from app.database import get_db
 from app.middleware import success, error, admin_required, user_or_admin_required
 from app.repositories import BakeryRepository, RatingRepository, ProductTypeRepository
@@ -48,7 +48,6 @@ def create_bakery():
     if not name:
         return error("Le champ 'name' est requis", "MISSING_NAME", 400)
 
-    from flask import g
     db     = get_db()
     bakery = BakeryRepository(db).create(
         name=name, neighborhood=neighborhood, address=address,
