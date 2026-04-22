@@ -1051,6 +1051,205 @@ function AdminView() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  Footer
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Footer() {
+  return (
+    <footer style={{ background: T.dark, color: "#FAF3E4", padding: "40px 32px", marginTop: 64, textAlign: "center" }}>
+      <div style={{ fontSize: 32, marginBottom: 10 }}>🥖</div>
+      <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.gold, marginBottom: 6 }}>Boulangeries Montréal</div>
+      <p style={{ fontSize: 13, color: "#FAF3E444", fontStyle: "italic" }}>
+        Guide collaboratif des boulangeries artisanales · Montréal, QC
+      </p>
+    </footer>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  HomeView  —  page d'accueil
+// ─────────────────────────────────────────────────────────────────────────────
+
+function HomeView({ onNavigate, onShowAuth }) {
+  const { bakeries, productTypes, user } = useApp();
+  const {
+    overallRanking, loadingOverall, fetchOverallRanking,
+    productRanking, loadingProduct, fetchProductRanking,
+  } = useRankings();
+  const [activePt, setActivePt] = useState(null);
+  const medals = ["🥇", "🥈", "🥉"];
+
+  useEffect(() => { fetchOverallRanking(); }, []);
+
+  useEffect(() => {
+    if (productTypes.length > 0 && !activePt) {
+      const first = productTypes[0].id;
+      setActivePt(first);
+      fetchProductRanking(first);
+    }
+  }, [productTypes]);
+
+  const handlePtChange = (id) => { setActivePt(id); fetchProductRanking(id); };
+  const top3     = overallRanking.slice(0, 3);
+  const totalAvis = overallRanking.reduce((a, b) => a + b.total_ratings, 0);
+
+  return (
+    <div>
+      {/* ── Hero ─────────────────────────────────────────── */}
+      <div style={{ background: `linear-gradient(135deg, ${T.dark} 0%, #3D1F0D 60%, #5C3020 100%)`, padding: "88px 32px 72px", textAlign: "center", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: -10, left: "5%",  fontSize: 160, opacity: 0.04, transform: "rotate(-20deg)", lineHeight: 1 }}>🥖</div>
+        <div style={{ position: "absolute", bottom: -20, right: "8%", fontSize: 180, opacity: 0.03, transform: "rotate(15deg)", lineHeight: 1 }}>🥐</div>
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 640, margin: "0 auto" }}>
+          <div style={{ display: "inline-block", background: `${T.gold}22`, border: `1px solid ${T.gold}44`, color: T.gold, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", padding: "6px 16px", borderRadius: 20, marginBottom: 22 }}>
+            Guide de dégustation artisanale
+          </div>
+          <h1 style={{ fontFamily: '"Playfair Display", serif', fontSize: "clamp(36px, 6vw, 60px)", fontWeight: 900, color: "#FAF3E4", lineHeight: 1.1, marginBottom: 18 }}>
+            Les meilleures<br />boulangeries de<br />
+            <span style={{ color: T.gold }}>Montréal</span>
+          </h1>
+          <p style={{ fontSize: 17, color: "#FAF3E499", fontStyle: "italic", marginBottom: 38, lineHeight: 1.7 }}>
+            Découvrez, évaluez et partagez vos coups de cœur<br />parmi les artisans boulangers de la métropole.
+          </p>
+          <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
+            <button onClick={() => onNavigate("rankings")}
+              style={{ background: T.gold, color: "white", border: "none", padding: "14px 30px", borderRadius: 10, fontSize: 15, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, boxShadow: `0 4px 20px ${T.gold}55` }}>
+              🏆 Voir le classement
+            </button>
+            <button onClick={() => onNavigate("bakeries")}
+              style={{ background: "transparent", color: "#FAF3E4", border: "2px solid #FFFFFF30", padding: "14px 30px", borderRadius: 10, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>
+              🏪 Explorer
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Stats ────────────────────────────────────────── */}
+      <div style={{ background: T.gold, padding: "22px 32px", display: "flex", justifyContent: "center", gap: "clamp(24px, 6vw, 72px)", flexWrap: "wrap" }}>
+        {[
+          ["🏪", bakeries.length,      "boulangeries"],
+          ["🥖", productTypes.length,  "produits notés"],
+          ["⭐", totalAvis || "—",     "avis déposés"],
+        ].map(([icon, num, label]) => (
+          <div key={label} style={{ textAlign: "center", color: "white" }}>
+            <div style={{ fontSize: 22 }}>{icon}</div>
+            <div style={{ fontSize: 30, fontWeight: 700, fontFamily: '"Playfair Display", serif', lineHeight: 1.1 }}>{num}</div>
+            <div style={{ fontSize: 12, opacity: 0.82, marginTop: 2 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "56px 32px" }}>
+
+        {/* ── Top boulangeries ─────────────────────────── */}
+        {!loadingOverall && top3.length > 0 && (
+          <section style={{ marginBottom: 64 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 28 }}>
+              <div>
+                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 30, color: T.dark }}>🏆 Meilleures boulangeries</h2>
+                <p style={{ color: T.muted, fontSize: 14, marginTop: 4, fontStyle: "italic" }}>Classées sur la moyenne de tous les produits évalués</p>
+              </div>
+              <button onClick={() => onNavigate("rankings")}
+                style={{ background: "none", border: "none", color: T.gold, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>
+                Classement complet →
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
+              {top3.map(({ bakery, overall_average, total_ratings, product_averages }, i) => (
+                <div key={bakery.id} onClick={() => onNavigate("bakeries")}
+                  style={{ background: i === 0 ? `linear-gradient(140deg, ${T.dark} 0%, #4A2A18 100%)` : "white", color: i === 0 ? "#FAF3E4" : T.dark, borderRadius: 18, padding: "26px 24px", border: `2px solid ${i === 0 ? T.gold : T.border}`, cursor: "pointer", boxShadow: i === 0 ? `0 8px 32px ${T.gold}33` : "0 2px 12px rgba(0,0,0,0.06)", transition: "transform 0.18s" }}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-3px)"}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+                  <div style={{ fontSize: 34, marginBottom: 10 }}>{medals[i]}</div>
+                  <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, fontWeight: 700, marginBottom: 3 }}>{bakery.name}</div>
+                  {bakery.neighborhood && <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 16 }}>{bakery.neighborhood}</div>}
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+                    <span style={{ fontSize: 38, fontWeight: 700, color: T.gold, lineHeight: 1, fontFamily: '"Playfair Display", serif' }}>{overall_average.toFixed(1)}</span>
+                    <div>
+                      <div style={{ display: "flex", gap: 2 }}>
+                        {[1,2,3,4,5].map(s => <span key={s} style={{ color: s <= Math.round(overall_average) ? T.gold : (i === 0 ? "#FFFFFF25" : T.border), fontSize: 15 }}>★</span>)}
+                      </div>
+                      <div style={{ fontSize: 12, opacity: 0.55, marginTop: 3 }}>{total_ratings} avis</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {product_averages.slice(0, 3).map(({ product_type, average }) => (
+                      <span key={product_type.id} style={{ background: i === 0 ? "#FFFFFF14" : T.bg, padding: "4px 12px", borderRadius: 20, fontSize: 12, border: `1px solid ${i === 0 ? "#FFFFFF18" : T.border}` }}>
+                        {product_type.emoji} {average.toFixed(1)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Par produit ───────────────────────────────── */}
+        {productTypes.length > 0 && (
+          <section style={{ marginBottom: 64 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 30, color: T.dark }}>Explorer par produit</h2>
+                <p style={{ color: T.muted, fontSize: 14, marginTop: 4, fontStyle: "italic" }}>Qui fait le meilleur croissant ? La meilleure baguette ?</p>
+              </div>
+              <button onClick={() => onNavigate("rankings")}
+                style={{ background: "none", border: "none", color: T.gold, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>
+                Voir tout →
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+              {productTypes.map(pt => (
+                <button key={pt.id} onClick={() => handlePtChange(pt.id)}
+                  style={{ padding: "10px 22px", border: `2px solid ${activePt === pt.id ? T.gold : T.border}`, background: activePt === pt.id ? T.gold : "white", color: activePt === pt.id ? "white" : T.muted, borderRadius: 30, fontSize: 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", fontWeight: activePt === pt.id ? 600 : 400 }}>
+                  {pt.emoji} {pt.name}
+                </button>
+              ))}
+            </div>
+            {loadingProduct ? <Spinner /> : productRanking.length === 0 ? (
+              <EmptyState text="Aucun avis pour ce produit encore." />
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {productRanking.slice(0, 5).map(({ bakery, overall_average, rating_count }, i) => (
+                  <div key={bakery.id} style={{ background: "white", borderRadius: 14, padding: "16px 22px", border: `1px solid ${i === 0 ? T.gold : T.border}`, display: "flex", alignItems: "center", gap: 18, boxShadow: i === 0 ? `0 2px 12px ${T.gold}22` : "none" }}>
+                    <div style={{ fontSize: 22, minWidth: 34, textAlign: "center" }}>{medals[i] ?? `#${i+1}`}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 17, color: T.dark }}>{bakery.name}</div>
+                      {bakery.neighborhood && <div style={{ fontSize: 13, color: T.muted }}>{bakery.neighborhood}</div>}
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 26, fontWeight: 700, color: T.gold, lineHeight: 1, fontFamily: '"Playfair Display", serif' }}>{overall_average.toFixed(1)}</div>
+                      <div style={{ fontSize: 11, color: T.muted }}>{rating_count} avis</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ── CTA inscription ───────────────────────────── */}
+        {!user && (
+          <section style={{ background: `linear-gradient(135deg, ${T.dark} 0%, #4A2A18 100%)`, borderRadius: 22, padding: "48px 40px", textAlign: "center", color: "#FAF3E4", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", right: -20, top: -20, fontSize: 120, opacity: 0.05 }}>✍️</div>
+            <div style={{ position: "relative", zIndex: 1 }}>
+              <div style={{ fontSize: 44, marginBottom: 14 }}>✍️</div>
+              <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: 26, marginBottom: 10 }}>Vous avez un avis à partager ?</h3>
+              <p style={{ color: `${T.gold}BB`, marginBottom: 28, fontStyle: "italic", lineHeight: 1.6 }}>
+                Créez un compte gratuit pour noter les boulangeries,<br />ajouter des établissements et contribuer au guide.
+              </p>
+              <button onClick={onShowAuth}
+                style={{ background: T.gold, color: "white", border: "none", padding: "14px 32px", borderRadius: 10, fontSize: 15, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, boxShadow: `0 4px 20px ${T.gold}44` }}>
+                Créer un compte gratuit
+              </button>
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  AuthModal  —  connexion / inscription
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1101,6 +1300,7 @@ function AuthModal({ onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const VIEWS = [
+  { id: "home",     icon: "🏠", label: "Accueil" },
   { id: "rankings", icon: "🏆", label: "Classements" },
   { id: "bakeries", icon: "🏪", label: "Boulangeries" },
 ];
@@ -1108,7 +1308,7 @@ const VIEWS = [
 function Shell() {
   const { loading, isAdmin } = useApp();
   const { user, logout }     = useUserAuth();
-  const [view,      setView]      = useState("rankings");
+  const [view,      setView]      = useState("home");
   const [showAuth,  setShowAuth]  = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
 
@@ -1161,9 +1361,14 @@ function Shell() {
         </div>
       </header>
 
-      <main style={{ padding: "32px", maxWidth: 1080, margin: "0 auto" }}>
-        {view === "rankings" && <RankingsView />}
-        {view === "bakeries" && <BakeriesView />}
+      <main>
+        {view === "home" && <HomeView onNavigate={setView} onShowAuth={() => setShowAuth(true)} />}
+        {view !== "home" && (
+          <div style={{ padding: "32px", maxWidth: 1080, margin: "0 auto" }}>
+            {view === "rankings" && <RankingsView />}
+            {view === "bakeries" && <BakeriesView />}
+          </div>
+        )}
       </main>
 
       {showAdmin && (
@@ -1174,6 +1379,8 @@ function Shell() {
           </div>
         </div>
       )}
+
+      <Footer />
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
 
