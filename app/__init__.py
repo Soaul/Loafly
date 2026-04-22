@@ -10,10 +10,13 @@ def create_app(config: type = Config) -> Flask:
     @app.after_request
     def add_cors(response):
         origin = request.headers.get("Origin", "")
-        if origin in config.CORS_ORIGINS:
+        allowed = config.CORS_ORIGINS
+        if origin and (not allowed or origin in allowed or "*" in allowed):
             response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Admin-Password, Authorization"
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        elif not origin:
+            response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Admin-Password, Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         return response
 
     @app.route("/api/<path:path>", methods=["OPTIONS"])
