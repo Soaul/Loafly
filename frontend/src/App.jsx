@@ -499,7 +499,7 @@ const T = {
 const css = {
   input:    { width: "100%", padding: "10px 14px", border: `1.5px solid ${T.border}`, borderRadius: 8, fontSize: 15, background: "white", color: T.dark, fontFamily: "inherit" },
   btnDark:  { background: T.dark,  color: "#FAF3E4", border: "none", padding: "10px 20px", borderRadius: 8, fontSize: 14, cursor: "pointer", fontFamily: "inherit" },
-  btnGold:  { background: T.gold,  color: "white",   border: "none", padding: "12px 24px", borderRadius: 8, fontSize: 15, cursor: "pointer", width: "100%", fontFamily: "inherit" },
+  btnGold:  { background: `linear-gradient(135deg, ${T.gold}, #E8B84B)`, color: "white", border: "none", padding: "13px 24px", borderRadius: 10, fontSize: 15, cursor: "pointer", width: "100%", fontFamily: "inherit", fontWeight: 600, boxShadow: "0 4px 16px rgba(200,145,42,0.3)" },
   btnGhost: { background: "none",  border: `1px solid ${T.border}`, color: T.danger, padding: "10px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontFamily: "inherit" },
   btnSm:    { background: `${T.gold}22`, color: T.gold, border: `1px solid ${T.gold}55`, padding: "7px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "inherit" },
 };
@@ -537,16 +537,18 @@ function Stars({ value = 0, onChange, size = 22, readOnly = false }) {
   );
 }
 
-function Modal({ title, onClose, children, maxWidth = 460 }) {
+function Modal({ title, onClose, children, maxWidth = 480 }) {
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(28,15,7,0.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "60px 16px 40px" }}
+    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(28,15,7,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: T.bg, borderRadius: 16, padding: 32, width: "100%", maxWidth, boxShadow: "0 8px 40px rgba(0,0,0,0.25)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, color: T.dark }}>{title}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 26, color: T.muted, cursor: "pointer", lineHeight: 1, padding: 0 }}>×</button>
+      <div style={{ background: T.bg, borderRadius: 20, width: "100%", maxWidth, boxShadow: "0 24px 64px rgba(44,24,16,0.35)", overflow: "hidden" }}>
+        <div style={{ background: T.dark, padding: "20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, fontWeight: 700, color: "#FAF3E4", lineHeight: 1.2 }}>{title}</h3>
+          <button onClick={onClose} style={{ background: "#ffffff15", border: "none", width: 32, height: 32, borderRadius: 8, color: "#FAF3E490", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, flexShrink: 0 }}>×</button>
         </div>
-        {children}
+        <div style={{ padding: "28px 28px 24px" }}>
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -685,11 +687,11 @@ function AddRatingModal({ bakery, productTypes, defaultPtId, onClose, onSave }) 
   );
 }
 
-function ProductRankingView() {
+function ProductRankingView({ forcedPtId }) {
   const { productTypes }                                          = useApp();
   const { submitRating }                                          = useRatings();
   const { productRanking, loadingProduct, fetchProductRanking }   = useRankings();
-  const [ptId, setPtId]         = useState(() => productTypes[0]?.id ?? null);
+  const ptId = forcedPtId;
   const [ratingTarget, setRatingTarget] = useState(null);
   const medals = ["🥇", "🥈", "🥉"];
 
@@ -836,16 +838,56 @@ function OverallRankingView() {
 }
 
 function RankingsView() {
-  const [sub, setSub] = useState("product");
-  const SUB = [["product", "🥖 Par produit"], ["overall", "🏅 Classement général"]];
+  const { productTypes } = useApp();
+  const [sub, setSub] = useState("overall");
+  const [ptId, setPtId] = useState(null);
+  const [dropOpen, setDropOpen] = useState(false);
+  const dropRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (dropRef.current && !dropRef.current.contains(e.target)) setDropOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selectedPt = productTypes.find((p) => p.id === ptId);
+
   return (
     <div>
-      <div style={{ display: "flex", gap: 4, background: "white", border: `1px solid ${T.border}`, borderRadius: 10, padding: 4, marginBottom: 28, width: "fit-content" }}>
-        {SUB.map(([id, label]) => (
-          <button key={id} onClick={() => setSub(id)} style={{ padding: "8px 20px", border: "none", borderRadius: 7, background: sub === id ? T.dark : "transparent", color: sub === id ? "#FAF3E4" : T.muted, fontSize: 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>{label}</button>
-        ))}
+      {/* ── Nav : bouton Général + dropdown produit ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32, flexWrap: "wrap" }}>
+        <button onClick={() => setSub("overall")}
+          style={{ padding: "11px 22px", border: `2px solid ${sub === "overall" ? T.dark : T.border}`, background: sub === "overall" ? T.dark : "white", color: sub === "overall" ? "#FAF3E4" : T.muted, borderRadius: 10, fontSize: 15, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s", display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+          🏅 Général
+        </button>
+
+        {/* Dropdown custom */}
+        <div ref={dropRef} style={{ position: "relative", minWidth: 240 }}>
+          <button onClick={() => setDropOpen((o) => !o)}
+            style={{ width: "100%", padding: "11px 16px", border: `2px solid ${sub === "product" ? T.gold : T.border}`, borderRadius: 10, background: "white", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", fontFamily: "inherit", fontSize: 15, color: selectedPt ? T.dark : T.muted, boxShadow: sub === "product" ? `0 2px 8px ${T.gold}22` : "none", transition: "all 0.15s" }}>
+            <span>{selectedPt ? `${selectedPt.emoji}  ${selectedPt.name}` : "🥐 Choisir un produit…"}</span>
+            <span style={{ color: T.muted, fontSize: 12, display: "inline-block", transition: "transform 0.2s", transform: dropOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+          </button>
+          {dropOpen && (
+            <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "white", borderRadius: 12, border: `2px solid ${T.border}`, boxShadow: "0 8px 32px rgba(44,24,16,0.15)", zIndex: 500, overflow: "hidden" }}>
+              {productTypes.map((p) => (
+                <div key={p.id}
+                  onClick={() => { setPtId(p.id); setSub("product"); setDropOpen(false); }}
+                  style={{ padding: "12px 18px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 15, background: ptId === p.id ? T.bg : "white", color: T.dark, borderBottom: `1px solid #F0E8D5`, transition: "background 0.12s" }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = T.bg}
+                  onMouseLeave={(e) => e.currentTarget.style.background = ptId === p.id ? T.bg : "white"}>
+                  <span style={{ fontSize: 18 }}>{p.emoji}</span>
+                  <span>{p.name}</span>
+                  {ptId === p.id && <span style={{ marginLeft: "auto", color: T.gold, fontSize: 13 }}>✓</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-      {sub === "product" && <ProductRankingView />}
+
+      {sub === "product" && ptId && <ProductRankingView forcedPtId={ptId} />}
+      {sub === "product" && !ptId && <EmptyState text="Choisissez un produit dans le menu." />}
       {sub === "overall" && <OverallRankingView />}
     </div>
   );
@@ -1691,29 +1733,43 @@ function Shell() {
       `}</style>
 
       {/* ── Header ── */}
-      <header style={{ background: T.dark, color: "#FAF3E4", padding: isMobile ? "0 16px" : "0 24px", display: "flex", alignItems: "stretch", justifyContent: "space-between", height: 58, position: "sticky", top: 0, zIndex: 150 }}>
-        <button onClick={() => setView("home")} style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", color: "#FAF3E4", cursor: "pointer", padding: 0 }}>
-          <span style={{ fontSize: 22 }}>🥖</span>
+      <header style={{ background: T.bg, padding: isMobile ? "8px 12px" : "10px 24px", position: "sticky", top: 0, zIndex: 150 }}>
+        <div style={{ background: T.dark, borderRadius: 18, padding: isMobile ? "8px 12px" : "8px 8px 8px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 4px 24px rgba(44,24,16,0.18)", maxWidth: 1080, margin: "0 auto" }}>
+        <button onClick={() => setView("home")} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", color: "#FAF3E4", cursor: "pointer", padding: 0 }}>
+          <svg width="40" height="40" viewBox="0 0 140 140" fill="none">
+            <circle cx="70" cy="70" r="68" fill="#C8912A"/>
+            <circle cx="70" cy="70" r="62" fill="none" stroke="#FAF3E4" strokeWidth="1.2"/>
+            <circle cx="70" cy="70" r="56" fill="none" stroke="#FAF3E4" strokeWidth="0.5" strokeDasharray="3 4"/>
+            <g transform="translate(70,70)">
+              <path d="M-42,0 Q-38,-11 -26,-11 L26,-11 Q38,-11 42,0 Q38,11 26,11 L-26,11 Q-38,11 -42,0Z" fill="#2C1810"/>
+              <path d="M-38,-2 Q-28,-9 0,-9 Q22,-9 38,-2" stroke="#5A3020" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.5"/>
+              <line x1="-28" y1="-12" x2="-22" y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.5"/>
+              <line x1="-15" y1="-12" x2="-9" y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.5"/>
+              <line x1="-2" y1="-12" x2="4" y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.5"/>
+              <line x1="11" y1="-12" x2="17" y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.5"/>
+              <line x1="24" y1="-12" x2="30" y2="12" stroke="#FAF3E4" strokeWidth="1.4" strokeLinecap="round" opacity="0.5"/>
+            </g>
+          </svg>
           <div style={{ textAlign: "left" }}>
-            <div style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 17 : 20, fontWeight: 900, lineHeight: 1.1 }}>Loafly</div>
-            {!isMobile && <div style={{ fontSize: 11, color: T.gold, fontStyle: "italic" }}>Boulangeries artisanales · Montréal</div>}
+            <div style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 16 : 18, fontWeight: 900, lineHeight: 1.15, color: "#FAF3E4" }}>Loafly</div>
+            {!isMobile && <div style={{ fontSize: 11, color: `${T.gold}99` }}>Boulangeries artisanales · Montréal</div>}
           </div>
         </button>
 
-        <div style={{ display: "flex", alignItems: "stretch", gap: 2 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* Nav desktop uniquement */}
           {!isMobile && (
-            <nav style={{ display: "flex", alignItems: "stretch", gap: 2 }}>
+            <nav style={{ display: "flex", alignItems: "center", gap: 4, background: "#ffffff0f", borderRadius: 12, padding: 4 }}>
               {VIEWS.map(({ id, icon, label }) => (
                 <button key={id} onClick={() => setView(id)}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 16px", border: "none", background: view === id ? `${T.gold}22` : "transparent", color: view === id ? T.gold : "#FAF3E470", borderBottom: `2px solid ${view === id ? T.gold : "transparent"}`, fontSize: 14, cursor: "pointer", transition: "all 0.18s" }}>
-                  <span style={{ fontSize: 15 }}>{icon}</span> {label}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "none", borderRadius: 9, background: view === id ? T.gold : "transparent", color: view === id ? "white" : "#FAF3E460", fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>
+                  <span style={{ fontSize: 14 }}>{icon}</span> {label}
                 </button>
               ))}
             </nav>
           )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: isMobile ? 0 : 16, borderLeft: isMobile ? "none" : `1px solid #FFFFFF18` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: isMobile ? 0 : 8 }}>
             {user ? (
               <>
                 {!isMobile && <span style={{ fontSize: 13, color: T.gold }}>@{user.username}</span>}
@@ -1722,11 +1778,14 @@ function Shell() {
                 </button>
               </>
             ) : (
-              <button onClick={() => setShowAuth(true)} style={{ background: T.gold, border: "none", color: "white", padding: "7px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+              <button onClick={() => setShowAuth(true)} style={{ background: T.gold, border: "none", color: "white", padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
                 {isMobile ? "Connexion" : "Se connecter"}
               </button>
             )}
           </div>
+        </div>
+        </div>
+      </header>
         </div>
       </header>
 
