@@ -25,9 +25,10 @@ import { useState, useEffect, useCallback, useContext, createContext, useMemo } 
 //  Un seul endroit pour tous les appels fetch. Jamais de fetch() en dehors.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API_BASE =
+const API_BASE = (
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
-  "http://localhost:5000/api";
+  "http://localhost:5000/api"
+).replace(/\/$/, "");
 
 class ApiError extends Error {
   constructor(message, code, status) {
