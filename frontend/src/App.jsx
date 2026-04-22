@@ -561,17 +561,11 @@ function Modal({ title, onClose, children, maxWidth = 480 }) {
       <div style={{ background: T.bg, borderRadius: 20, width: "100%", maxWidth, boxShadow: "0 24px 64px rgba(44,24,16,0.35)", overflow: "hidden" }}>
         <div style={{ background: T.dark, padding: "20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, fontWeight: 700, color: "#FAF3E4", lineHeight: 1.2 }}>{title}</h3>
-<<<<<<< HEAD
           <button onClick={onClose} style={{ background: "#ffffff15", border: "none", width: 32, height: 32, borderRadius: 8, color: "#FAF3E490", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, flexShrink: 0 }}>×</button>
         </div>
         <div style={{ padding: "28px 28px 24px" }}>
           {children}
         </div>
-=======
-          <button onClick={onClose} style={{ background: "#ffffff15", border: "none", width: 32, height: 32, borderRadius: 8, color: "#FAF3E490", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
-        </div>
-        <div style={{ padding: "28px 28px 24px" }}>{children}</div>
->>>>>>> 1e79e60 (some frontend improvments)
       </div>
     </div>
   );
@@ -1805,7 +1799,6 @@ function Shell() {
       `}</style>
 
       {/* ── Header ── */}
-<<<<<<< HEAD
       <header style={{ background: T.bg, padding: isMobile ? "8px 12px" : "10px 24px", position: "sticky", top: 0, zIndex: 150 }}>
         <div style={{ background: T.dark, borderRadius: 18, padding: isMobile ? "8px 12px" : "8px 8px 8px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 4px 24px rgba(44,24,16,0.18)", maxWidth: 1080, margin: "0 auto" }}>
         <button onClick={() => setView("home")} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", color: "#FAF3E4", cursor: "pointer", padding: 0 }}>
@@ -1854,29 +1847,6 @@ function Shell() {
               <button onClick={() => setShowAuth(true)} style={{ background: T.gold, border: "none", color: "white", padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
                 {isMobile ? "Connexion" : "Se connecter"}
               </button>
-=======
-      <header style={{ background: T.bg, padding: isMobile ? "8px 16px" : "10px 24px", position: "sticky", top: 0, zIndex: 150 }}>
-        <div style={{ background: T.dark, borderRadius: 18, padding: isMobile ? "8px 12px" : "8px 8px 8px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 4px 24px rgba(44,24,16,0.18)", maxWidth: 1080, margin: "0 auto" }}>
-          <button onClick={() => setView("home")} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", color: "#FAF3E4", cursor: "pointer", padding: 0 }}>
-            <LogoSVG size={isMobile ? 36 : 44} />
-            <div style={{ textAlign: "left" }}>
-              <div style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 16 : 18, fontWeight: 900, lineHeight: 1.15, color: "#FAF3E4" }}>Loafly</div>
-              {!isMobile && <div style={{ fontSize: 11, color: `${T.gold}99` }}>Boulangeries artisanales · Montréal</div>}
-            </div>
-          </button>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {/* Nav desktop uniquement */}
-            {!isMobile && (
-              <nav style={{ display: "flex", alignItems: "center", gap: 4, background: "#ffffff0f", borderRadius: 12, padding: 4 }}>
-                {VIEWS.map(({ id, icon, label }) => (
-                  <button key={id} onClick={() => setView(id)}
-                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "none", borderRadius: 9, background: view === id ? T.gold : "transparent", color: view === id ? "white" : "#FAF3E460", fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>
-                    <span style={{ fontSize: 14 }}>{icon}</span>{label}
-                  </button>
-                ))}
-              </nav>
->>>>>>> 1e79e60 (some frontend improvments)
             )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: isMobile ? 0 : 8 }}>
