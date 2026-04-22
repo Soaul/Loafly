@@ -9,7 +9,7 @@ routes/bakeries.py
 
 from flask import Blueprint, request
 from app.database import get_db
-from app.middleware import success, error, admin_required
+from app.middleware import success, error, admin_required, user_or_admin_required
 from app.repositories import BakeryRepository, RatingRepository, ProductTypeRepository
 
 bakeries_bp = Blueprint("bakeries", __name__, url_prefix="/api/bakeries")
@@ -33,10 +33,11 @@ def list_bakeries():
 
 
 @bakeries_bp.post("/")
-@admin_required
+@user_or_admin_required
 def create_bakery():
     """
     Crée une boulangerie.
+    Accessible aux utilisateurs connectés et aux admins.
     Body JSON : { "name": "...", "neighborhood": "...", "address": "..." }
     """
     body         = request.get_json(silent=True) or {}
@@ -47,8 +48,12 @@ def create_bakery():
     if not name:
         return error("Le champ 'name' est requis", "MISSING_NAME", 400)
 
-    db = get_db()
-    bakery = BakeryRepository(db).create(name=name, neighborhood=neighborhood, address=address)
+    from flask import g
+    db     = get_db()
+    bakery = BakeryRepository(db).create(
+        name=name, neighborhood=neighborhood, address=address,
+        created_by=g.user_id,
+    )
     return success(bakery, "Boulangerie créée", 201)
 
 

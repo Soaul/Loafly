@@ -1,5 +1,4 @@
-from flask import Flask, jsonify
-from flask_cors import CORS
+from flask import Flask, jsonify, request
 from app.config import Config
 from app.routes import register_routes
 
@@ -8,8 +7,18 @@ def create_app(config: type = Config) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config)
 
-    # CORS — autorise uniquement les origines déclarées dans .env
-    CORS(app, origins=config.CORS_ORIGINS, supports_credentials=False)
+    @app.after_request
+    def add_cors(response):
+        origin = request.headers.get("Origin", "")
+        if origin in config.CORS_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Admin-Password, Authorization"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        return response
+
+    @app.route("/api/<path:path>", methods=["OPTIONS"])
+    def handle_options(path):
+        return add_cors(jsonify({})), 200
 
     # Blueprints
     register_routes(app)

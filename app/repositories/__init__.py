@@ -139,10 +139,10 @@ class BakeryRepository:
         )
         return result.data
 
-    def create(self, name: str, neighborhood: str, address: str) -> dict:
+    def create(self, name: str, neighborhood: str, address: str, created_by: str | None = None) -> dict:
         result = (
             self.db.table("bakeries")
-            .insert({"name": name, "neighborhood": neighborhood, "address": address})
+            .insert({"name": name, "neighborhood": neighborhood, "address": address, "created_by": created_by})
             .execute()
         )
         return result.data[0]

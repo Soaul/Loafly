@@ -18,7 +18,7 @@
  *   VITE_API_URL=http://localhost:5000/api
  */
 
-import { useState, useEffect, useCallback, useContext, createContext, useMemo } from "react";
+import { useState, useEffect, useCallback, useContext, createContext } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ApiClient  —  src/api/client.js
@@ -38,10 +38,11 @@ class ApiError extends Error {
   }
 }
 
-async function apiFetch(path, options = {}, adminPin = null) {
+async function apiFetch(path, options = {}, adminPassword = null, userToken = null) {
   const headers = {
     "Content-Type": "application/json",
-    ...(adminPin ? { "X-Admin-Pin": adminPin } : {}),
+    ...(adminPassword ? { "X-Admin-Password": adminPassword } : {}),
+    ...(userToken    ? { "Authorization": `Bearer ${userToken}` } : {}),
     ...options.headers,
   };
 
@@ -57,10 +58,10 @@ async function apiFetch(path, options = {}, adminPin = null) {
 const ApiClient = {
   // ── Auth ──────────────────────────────────────────────────────────────────
   auth: {
-    verify: (pin) =>
-      apiFetch("/auth/verify", { method: "POST", body: JSON.stringify({ pin }) }),
-    changePin: (newPin, adminPin) =>
-      apiFetch("/auth/pin", { method: "PUT", body: JSON.stringify({ new_pin: newPin }) }, adminPin),
+    verify: (username, password) =>
+      apiFetch("/auth/verify", { method: "POST", body: JSON.stringify({ username, password }) }),
+    changePassword: (newPassword, adminPassword) =>
+      apiFetch("/auth/password", { method: "PUT", body: JSON.stringify({ new_password: newPassword }) }, adminPassword),
   },
 
   // ── Product types ─────────────────────────────────────────────────────────
@@ -83,16 +84,40 @@ const ApiClient = {
       apiFetch("/bakeries/"),
     get: (id) =>
       apiFetch(`/bakeries/${id}`),
-    create: (payload, adminPin) =>
-      apiFetch("/bakeries/", { method: "POST", body: JSON.stringify(payload) }, adminPin),
+    create: (payload, adminPin, userToken) =>
+      apiFetch("/bakeries/", { method: "POST", body: JSON.stringify(payload) }, adminPin, userToken),
     remove: (id, adminPin) =>
       apiFetch(`/bakeries/${id}`, { method: "DELETE" }, adminPin),
   },
 
+  // ── Users ─────────────────────────────────────────────────────────────────
+  users: {
+    signup: (username, email, password) =>
+      apiFetch("/users/signup", { method: "POST", body: JSON.stringify({ username, email, password }) }),
+    login: (email, password) =>
+      apiFetch("/users/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+  },
+
+  // ── Photos ────────────────────────────────────────────────────────────────
+  photos: {
+    upload: async (file, userToken) => {
+      const form = new FormData();
+      form.append("photo", file);
+      const res  = await fetch(`${API_BASE}/photos/upload`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${userToken}` },
+        body: form,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new ApiError(body.error ?? "Erreur upload", body.code, res.status);
+      return body.data ?? body;
+    },
+  },
+
   // ── Ratings ───────────────────────────────────────────────────────────────
   ratings: {
-    submit: (payload) =>
-      apiFetch("/ratings/", { method: "POST", body: JSON.stringify(payload) }),
+    submit: (payload, userToken) =>
+      apiFetch("/ratings/", { method: "POST", body: JSON.stringify(payload) }, null, userToken),
   },
 
   // ── Rankings ──────────────────────────────────────────────────────────────
@@ -115,9 +140,18 @@ function AppProvider({ children }) {
   const [productTypes, setProductTypes] = useState([]);
   const [bakeries,     setBakeries]     = useState([]);
   const [loading,      setLoading]      = useState(true);
-  const [adminPin,     setAdminPin]     = useState(null); // null = non connecté
+  const [adminPin,     setAdminPin]     = useState(null);
+  const [user,         setUserState]    = useState(() => {
+    try { return JSON.parse(localStorage.getItem("loafly_user")); } catch { return null; }
+  });
   const [toast,        setToast]        = useState(null);
   const [confirm,      setConfirm]      = useState(null);
+
+  const setUser = useCallback((u) => {
+    setUserState(u);
+    if (u) localStorage.setItem("loafly_user", JSON.stringify(u));
+    else   localStorage.removeItem("loafly_user");
+  }, []);
 
   // Chargement initial des données de référence
   const fetchBaseData = useCallback(async () => {
@@ -154,6 +188,7 @@ function AppProvider({ children }) {
   const value = {
     productTypes, bakeries, loading,
     adminPin, isAdmin, setAdminPin,
+    user, setUser,
     refresh, notify, requestConfirm,
   };
 
@@ -185,11 +220,11 @@ const useApp = () => {
 function useAdminAuth() {
   const { adminPin, isAdmin, setAdminPin, notify } = useApp();
 
-  const login = useCallback(async (pin) => {
+  const login = useCallback(async (username, password) => {
     try {
-      const res = await ApiClient.auth.verify(pin);
-      if (res.valid) { setAdminPin(pin); return true; }
-      notify("PIN incorrect", "error");
+      const res = await ApiClient.auth.verify(username, password);
+      if (res.valid) { setAdminPin(password); return true; }
+      notify("Identifiants incorrects", "error");
       return false;
     } catch (e) {
       notify(e.message, "error");
@@ -199,12 +234,12 @@ function useAdminAuth() {
 
   const logout = useCallback(() => setAdminPin(null), [setAdminPin]);
 
-  const changePin = useCallback(async (newPin) => {
+  const changePassword = useCallback(async (newPassword) => {
     if (!adminPin) { notify("Non connecté", "error"); return false; }
     try {
-      await ApiClient.auth.changePin(newPin, adminPin);
-      notify("PIN modifié !");
-      setAdminPin(newPin); // Mettre à jour le PIN en mémoire
+      await ApiClient.auth.changePassword(newPassword, adminPin);
+      notify("Mot de passe modifié !");
+      setAdminPin(newPassword);
       return true;
     } catch (e) {
       notify(e.message, "error");
@@ -212,7 +247,37 @@ function useAdminAuth() {
     }
   }, [adminPin, setAdminPin, notify]);
 
-  return { isAdmin, login, logout, changePin };
+  return { isAdmin, login, logout, changePassword };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  hooks/useUserAuth.js
+// ─────────────────────────────────────────────────────────────────────────────
+
+function useUserAuth() {
+  const { user, setUser, notify } = useApp();
+
+  const signup = useCallback(async (username, email, password) => {
+    try {
+      const res = await ApiClient.users.signup(username, email, password);
+      setUser({ token: res.token, username: res.username });
+      notify(`Bienvenue, ${res.username} !`);
+      return true;
+    } catch (e) { notify(e.message, "error"); return false; }
+  }, [setUser, notify]);
+
+  const login = useCallback(async (email, password) => {
+    try {
+      const res = await ApiClient.users.login(email, password);
+      setUser({ token: res.token, username: res.username });
+      notify(`Bon retour, ${res.username} !`);
+      return true;
+    } catch (e) { notify(e.message, "error"); return false; }
+  }, [setUser, notify]);
+
+  const logout = useCallback(() => { setUser(null); notify("Déconnecté"); }, [setUser, notify]);
+
+  return { user, signup, login, logout };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -275,17 +340,17 @@ function useProductTypes() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function useBakeries() {
-  const { bakeries, adminPin, isAdmin, refresh, notify, requestConfirm } = useApp();
+  const { bakeries, adminPin, isAdmin, user, refresh, notify, requestConfirm } = useApp();
 
   const addBakery = useCallback(async (payload) => {
-    if (!isAdmin) { notify("Seul l'admin peut ajouter une boulangerie", "error"); return null; }
+    if (!isAdmin && !user) { notify("Connectez-vous pour ajouter une boulangerie", "error"); return null; }
     try {
-      const b = await ApiClient.bakeries.create(payload, adminPin);
+      const b = await ApiClient.bakeries.create(payload, isAdmin ? adminPin : null, user?.token);
       await refresh();
       notify("Boulangerie ajoutée !");
       return b;
     } catch (e) { notify(e.message, "error"); return null; }
-  }, [adminPin, isAdmin, refresh, notify]);
+  }, [adminPin, isAdmin, user, refresh, notify]);
 
   const removeBakery = useCallback((bakeryId) => {
     if (!isAdmin) { notify("Action réservée à l'admin", "error"); return; }
@@ -306,18 +371,28 @@ function useBakeries() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function useRatings() {
-  const { notify } = useApp();
+  const { notify, user } = useApp();
 
-  const submitRating = useCallback(async (payload) => {
+  const submitRating = useCallback(async (payload, photoFile) => {
+    if (!user) { notify("Connectez-vous pour laisser un avis", "error"); return false; }
+    let photo_url = null;
+    if (photoFile) {
+      try {
+        const res = await ApiClient.photos.upload(photoFile, user.token);
+        photo_url = res.url;
+      } catch {
+        notify("Photo non uploadée, on continue sans", "error");
+      }
+    }
     try {
-      await ApiClient.ratings.submit(payload);
+      await ApiClient.ratings.submit({ ...payload, photo_url }, user.token);
       notify("Avis enregistré, merci !");
       return true;
     } catch (e) {
       notify(e.message, "error");
       return false;
     }
-  }, [notify]);
+  }, [notify, user]);
 
   return { submitRating };
 }
@@ -480,14 +555,12 @@ function Spinner() {
   return <div style={{ textAlign: "center", padding: 40, color: T.muted, fontStyle: "italic" }}>Chargement…</div>;
 }
 
-function PinInput({ value, onChange }) {
-  return <input type="password" value={value} onChange={(e) => onChange(e.target.value)} placeholder="• • • •" style={{ ...css.input, letterSpacing: "0.2em", fontSize: 20, textAlign: "center" }} />;
-}
 
 function AdminGate({ children }) {
-  const { isAdmin } = useApp();
-  const { login }   = useAdminAuth();
-  const [pin, setPin] = useState("");
+  const { isAdmin }              = useApp();
+  const { login }                = useAdminAuth();
+  const [username, setUsername]  = useState("loafadmin");
+  const [password, setPassword]  = useState("");
 
   if (isAdmin) return children;
 
@@ -495,10 +568,17 @@ function AdminGate({ children }) {
     <div style={{ maxWidth: 360, margin: "80px auto", textAlign: "center" }}>
       <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
       <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 22, color: T.dark, marginBottom: 8 }}>Accès administrateur</h2>
-      <p style={{ color: T.muted, fontSize: 14, marginBottom: 28, fontStyle: "italic" }}>Entrez votre PIN pour accéder à l'espace admin.</p>
-      <Field label="PIN admin"><PinInput value={pin} onChange={setPin} /></Field>
-      <button onClick={async () => { const ok = await login(pin); if (ok) setPin(""); }} style={{ ...css.btnGold, marginTop: 8 }}>Se connecter</button>
-      <p style={{ fontSize: 12, color: T.muted, marginTop: 16, fontStyle: "italic" }}>PIN par défaut : 1234</p>
+      <p style={{ color: T.muted, fontSize: 14, marginBottom: 28, fontStyle: "italic" }}>Connectez-vous pour accéder à l'espace admin.</p>
+      <Field label="Nom d'utilisateur">
+        <input value={username} onChange={(e) => setUsername(e.target.value)} style={css.input} />
+      </Field>
+      <Field label="Mot de passe">
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") login(username, password).then(ok => { if (ok) setPassword(""); }); }}
+          placeholder="••••••••" style={css.input} />
+      </Field>
+      <button onClick={async () => { const ok = await login(username, password); if (ok) setPassword(""); }}
+        style={{ ...css.btnGold, marginTop: 8 }}>Se connecter</button>
     </div>
   );
 }
@@ -512,7 +592,17 @@ function AddRatingModal({ bakery, productTypes, defaultPtId, onClose, onSave }) 
   const [scores,     setScores]     = useState({});
   const [note,       setNote]       = useState("");
   const [authorName, setAuthorName] = useState("");
+  const [photoFile,  setPhotoFile]  = useState(null);
+  const [preview,    setPreview]    = useState(null);
   const pt = productTypes.find((p) => p.id === ptId);
+
+  const handlePhoto = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setPhotoFile(f);
+    setPreview(URL.createObjectURL(f));
+  };
+
   return (
     <Modal title={`Donner mon avis — ${bakery.name}`} onClose={onClose} maxWidth={480}>
       <Field label="Prénom / pseudo"><input value={authorName} onChange={(e) => setAuthorName(e.target.value)} placeholder="Ex : Marie" style={css.input} /></Field>
@@ -529,7 +619,13 @@ function AddRatingModal({ bakery, productTypes, defaultPtId, onClose, onSave }) 
       <Field label="Commentaire (optionnel)">
         <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Un mot sur votre dégustation…" style={{ ...css.input, resize: "vertical", minHeight: 72 }} />
       </Field>
-      <button onClick={() => onSave({ product_type_id: ptId, scores, note, author_name: authorName })} style={{ ...css.btnGold, marginTop: 4 }}>Envoyer mon avis</button>
+      <Field label="Photo (optionnel)">
+        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhoto}
+          style={{ fontSize: 13, color: T.muted }} />
+        {preview && <img src={preview} alt="preview" style={{ marginTop: 8, width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 8 }} />}
+      </Field>
+      <button onClick={() => onSave({ product_type_id: ptId, scores, note, author_name: authorName }, photoFile)}
+        style={{ ...css.btnGold, marginTop: 4 }}>Envoyer mon avis</button>
     </Modal>
   );
 }
@@ -546,8 +642,8 @@ function ProductRankingView() {
     if (ptId) fetchProductRanking(ptId);
   }, [ptId]);
 
-  const handleSave = async (payload) => {
-    const ok = await submitRating({ bakery_id: ratingTarget.id, ...payload });
+  const handleSave = async (payload, photoFile) => {
+    const ok = await submitRating({ bakery_id: ratingTarget.id, ...payload }, photoFile);
     if (ok) { setRatingTarget(null); fetchProductRanking(ptId); }
   };
 
@@ -623,8 +719,8 @@ function OverallRankingView() {
 
   useEffect(() => { fetchOverallRanking(); }, []);
 
-  const handleSave = async (payload) => {
-    const ok = await submitRating({ bakery_id: ratingTarget.id, ...payload });
+  const handleSave = async (payload, photoFile) => {
+    const ok = await submitRating({ bakery_id: ratingTarget.id, ...payload }, photoFile);
     if (ok) { setRatingTarget(null); fetchOverallRanking(); }
   };
 
@@ -649,7 +745,7 @@ function OverallRankingView() {
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {overallRanking.map(({ bakery, overall_average, product_count, total_ratings, product_averages }, i) => (
+        {overallRanking.map(({ bakery, overall_average, total_ratings, product_averages }, i) => (
           <div key={bakery.id} style={{ background: "white", borderRadius: 14, padding: "18px 22px", border: `2px solid ${i === 0 ? T.gold : T.border}`, display: "flex", alignItems: "center", gap: 18 }}>
             <div style={{ fontSize: 24, minWidth: 36, textAlign: "center" }}>{medals[i] ?? `#${i + 1}`}</div>
             <div style={{ flex: 1 }}>
@@ -718,8 +814,9 @@ function AddBakeryModal({ onClose, onSave }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function BakeriesView() {
-  const { productTypes, isAdmin }              = useApp();
-  const { bakeries, addBakery, removeBakery }  = useBakeries();
+  const { productTypes, isAdmin, user }         = useApp();
+  const { bakeries, addBakery, removeBakery }   = useBakeries();
+  const canAddBakery = isAdmin || !!user;
   const { submitRating }                       = useRatings();
 
   const [selectedId,    setSelectedId]    = useState(null);
@@ -745,11 +842,10 @@ function BakeriesView() {
     if (created) { setSelectedId(created.id); setShowAddBakery(false); }
   };
 
-  const handleAddRating = async (payload) => {
-    const ok = await submitRating({ bakery_id: selectedId, ...payload });
+  const handleAddRating = async (payload, photoFile) => {
+    const ok = await submitRating({ bakery_id: selectedId, ...payload }, photoFile);
     if (ok) {
       setShowAddRating(false);
-      // Recharger le détail
       const detail = await ApiClient.bakeries.get(selectedId);
       setBakeryDetail(detail);
     }
@@ -764,7 +860,7 @@ function BakeriesView() {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 28, alignItems: "start" }}>
       <div>
-        {isAdmin && <button onClick={() => setShowAddBakery(true)} style={{ ...css.btnDark, width: "100%", marginBottom: 16 }}>+ Ajouter une boulangerie</button>}
+        {canAddBakery && <button onClick={() => setShowAddBakery(true)} style={{ ...css.btnDark, width: "100%", marginBottom: 16 }}>+ Ajouter une boulangerie</button>}
         {bakeries.length === 0 && <p style={{ color: T.muted, fontStyle: "italic", fontSize: 14 }}>Aucune boulangerie.</p>}
         {bakeries.map((b) => (
           <div key={b.id} onClick={() => setSelectedId(b.id)}
@@ -851,7 +947,7 @@ function BakeriesView() {
 function AdminView() {
   const { productTypes }                                                                   = useApp();
   const { addProductType, removeProductType, addCriterion, removeCriterion }              = useProductTypes();
-  const { isAdmin, logout, changePin }                                                    = useAdminAuth();
+  const { logout, changePassword }                                                        = useAdminAuth();
 
   const [selectedPtId, setSelectedPtId] = useState(() => productTypes[0]?.id ?? null);
   const [tab,          setTab]          = useState("products");
@@ -882,14 +978,18 @@ function AdminView() {
 
         {tab === "security" && (
           <div style={{ background: "white", borderRadius: 14, padding: 26, border: `1px solid ${T.border}`, maxWidth: 380 }}>
-            <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.dark, marginBottom: 20 }}>🔑 Changer le PIN</div>
-            <Field label="Nouveau PIN"><PinInput value={pinForm.next} onChange={(v) => setPinForm((p) => ({ ...p, next: v }))} /></Field>
-            <Field label="Confirmer"><PinInput value={pinForm.confirm} onChange={(v) => setPinForm((p) => ({ ...p, confirm: v }))} /></Field>
+            <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.dark, marginBottom: 20 }}>🔑 Changer le mot de passe</div>
+            <Field label="Nouveau mot de passe">
+              <input type="password" value={pinForm.next} onChange={(e) => setPinForm((p) => ({ ...p, next: e.target.value }))} placeholder="••••••••" style={css.input} />
+            </Field>
+            <Field label="Confirmer">
+              <input type="password" value={pinForm.confirm} onChange={(e) => setPinForm((p) => ({ ...p, confirm: e.target.value }))} placeholder="••••••••" style={css.input} />
+            </Field>
             {pinForm.next && pinForm.confirm && pinForm.next !== pinForm.confirm && (
-              <p style={{ color: T.danger, fontSize: 13, marginBottom: 12 }}>Les PINs ne correspondent pas.</p>
+              <p style={{ color: T.danger, fontSize: 13, marginBottom: 12 }}>Les mots de passe ne correspondent pas.</p>
             )}
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={async () => { if (pinForm.next === pinForm.confirm) { const ok = await changePin(pinForm.next); if (ok) setPinForm({ next: "", confirm: "" }); } }} style={{ ...css.btnGold, flex: 1, width: "auto" }}>Modifier</button>
+              <button onClick={async () => { if (pinForm.next === pinForm.confirm) { const ok = await changePassword(pinForm.next); if (ok) setPinForm({ next: "", confirm: "" }); } }} style={{ ...css.btnGold, flex: 1, width: "auto" }}>Modifier</button>
               <button onClick={logout} style={{ ...css.btnGhost, color: T.muted }}>Déconnexion</button>
             </div>
           </div>
@@ -951,18 +1051,66 @@ function AdminView() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  AuthModal  —  connexion / inscription
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AuthModal({ onClose }) {
+  const { signup, login } = useUserAuth();
+  const [tab,      setTab]      = useState("login");
+  const [email,    setEmail]    = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleSubmit = async () => {
+    const ok = tab === "login"
+      ? await login(email, password)
+      : await signup(username, email, password);
+    if (ok) onClose();
+  };
+
+  return (
+    <Modal title={tab === "login" ? "Se connecter" : "Créer un compte"} onClose={onClose} maxWidth={380}>
+      <div style={{ display: "flex", gap: 4, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: 4, marginBottom: 24 }}>
+        {[["login", "Connexion"], ["signup", "Créer un compte"]].map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)}
+            style={{ flex: 1, padding: "7px 0", border: "none", borderRadius: 6, background: tab === id ? T.dark : "transparent", color: tab === id ? "#FAF3E4" : T.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>{label}</button>
+        ))}
+      </div>
+      {tab === "signup" && (
+        <Field label="Nom d'utilisateur">
+          <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ex : marie_mtl" style={css.input} />
+        </Field>
+      )}
+      <Field label="Email">
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@exemple.com" style={css.input} />
+      </Field>
+      <Field label="Mot de passe">
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+          placeholder="••••••••" style={css.input} />
+      </Field>
+      <button onClick={handleSubmit} style={{ ...css.btnGold, marginTop: 8 }}>
+        {tab === "login" ? "Se connecter" : "Créer mon compte"}
+      </button>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  App.jsx
 // ─────────────────────────────────────────────────────────────────────────────
 
 const VIEWS = [
-  { id: "rankings",  icon: "🏆", label: "Classements" },
-  { id: "bakeries",  icon: "🏪", label: "Boulangeries" },
-  { id: "admin",     icon: "⚙️", label: "Admin" },
+  { id: "rankings", icon: "🏆", label: "Classements" },
+  { id: "bakeries", icon: "🏪", label: "Boulangeries" },
 ];
 
 function Shell() {
   const { loading, isAdmin } = useApp();
-  const [view, setView]      = useState("rankings");
+  const { user, logout }     = useUserAuth();
+  const [view,      setView]      = useState("rankings");
+  const [showAuth,  setShowAuth]  = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "Georgia, serif", color: T.muted, background: T.bg }}>
@@ -971,7 +1119,7 @@ function Shell() {
   );
 
   return (
-    <div style={{ fontFamily: '"EB Garamond", Georgia, serif', background: T.bg, minHeight: "100vh", color: T.dark, position: "relative" }}>
+    <div style={{ fontFamily: '"EB Garamond", Georgia, serif', background: T.bg, minHeight: "100vh", color: T.dark }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -981,7 +1129,7 @@ function Shell() {
         ::-webkit-scrollbar-thumb { background: ${T.gold}; border-radius: 4px; }
       `}</style>
 
-      <header style={{ background: T.dark, color: "#FAF3E4", padding: "0 32px", display: "flex", alignItems: "stretch", justifyContent: "space-between", height: 64 }}>
+      <header style={{ background: T.dark, color: "#FAF3E4", padding: "0 24px", display: "flex", alignItems: "stretch", justifyContent: "space-between", height: 64 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <span style={{ fontSize: 26 }}>🥖</span>
           <div>
@@ -989,22 +1137,51 @@ function Shell() {
             <div style={{ fontSize: 11, color: T.gold, fontStyle: "italic" }}>Guide de dégustation artisanale</div>
           </div>
         </div>
-        <nav style={{ display: "flex", alignItems: "stretch", gap: 2 }}>
-          {VIEWS.map(({ id, icon, label }) => (
-            <button key={id} onClick={() => setView(id)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 18px", border: "none", background: view === id ? `${T.gold}22` : "transparent", color: view === id ? T.gold : "#FAF3E470", borderBottom: `2px solid ${view === id ? T.gold : "transparent"}`, fontSize: 14, cursor: "pointer", transition: "all 0.18s", position: "relative" }}>
-              <span style={{ fontSize: 15 }}>{icon}</span> {label}
-              {id === "admin" && isAdmin && <span style={{ position: "absolute", top: 14, right: 8, width: 7, height: 7, borderRadius: "50%", background: "#2C6E2C" }} />}
-            </button>
-          ))}
-        </nav>
+
+        <div style={{ display: "flex", alignItems: "stretch", gap: 2 }}>
+          <nav style={{ display: "flex", alignItems: "stretch", gap: 2 }}>
+            {VIEWS.map(({ id, icon, label }) => (
+              <button key={id} onClick={() => setView(id)}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 18px", border: "none", background: view === id ? `${T.gold}22` : "transparent", color: view === id ? T.gold : "#FAF3E470", borderBottom: `2px solid ${view === id ? T.gold : "transparent"}`, fontSize: 14, cursor: "pointer", transition: "all 0.18s" }}>
+                <span style={{ fontSize: 15 }}>{icon}</span> {label}
+              </button>
+            ))}
+          </nav>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 16, borderLeft: `1px solid #FFFFFF18` }}>
+            {user ? (
+              <>
+                <span style={{ fontSize: 13, color: T.gold }}>@{user.username}</span>
+                <button onClick={logout} style={{ background: "none", border: `1px solid #FFFFFF30`, color: "#FAF3E470", padding: "5px 12px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Déconnexion</button>
+              </>
+            ) : (
+              <button onClick={() => setShowAuth(true)} style={{ background: T.gold, border: "none", color: "white", padding: "7px 16px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Se connecter</button>
+            )}
+          </div>
+        </div>
       </header>
 
       <main style={{ padding: "32px", maxWidth: 1080, margin: "0 auto" }}>
         {view === "rankings" && <RankingsView />}
         {view === "bakeries" && <BakeriesView />}
-        {view === "admin"    && <AdminView />}
       </main>
+
+      {showAdmin && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(28,15,7,0.7)", overflowY: "auto" }}>
+          <div style={{ background: T.bg, minHeight: "100vh", padding: 32, maxWidth: 1080, margin: "0 auto", position: "relative" }}>
+            <button onClick={() => setShowAdmin(false)} style={{ position: "absolute", top: 24, right: 24, background: "none", border: "none", fontSize: 28, color: T.muted, cursor: "pointer" }}>×</button>
+            <AdminView />
+          </div>
+        </div>
+      )}
+
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+
+      <button onClick={() => setShowAdmin(true)} title="Admin"
+        style={{ position: "fixed", bottom: 20, right: 20, background: T.dark, border: `1px solid ${T.gold}44`, color: `${T.gold}88`, width: 36, height: 36, borderRadius: "50%", fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", zIndex: 100 }}>
+        🔐
+      </button>
+      {isAdmin && <span style={{ position: "fixed", bottom: 48, right: 22, width: 8, height: 8, borderRadius: "50%", background: "#2C6E2C", zIndex: 101 }} />}
     </div>
   );
 }
