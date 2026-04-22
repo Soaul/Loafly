@@ -224,7 +224,7 @@ class ConfigRepository:
             .maybe_single()
             .execute()
         )
-        return result.data["value"] if result.data else None
+        return result.data["value"] if result and result.data else None
 
     def set(self, key: str, value: str) -> None:
         self.db.table("app_config").upsert({"key": key, "value": value}).execute()
