@@ -210,10 +210,18 @@ function AppProvider({ children }) {
 
   const isAdmin = adminPin !== null;
 
+  const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const fn = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, []);
+  const isMobile = windowWidth < 768;
+
   const value = {
     productTypes, bakeries, loading,
     adminPin, isAdmin, setAdminPin,
-    user, setUser,
+    user, setUser, isMobile,
     refresh, notify, requestConfirm,
   };
 
@@ -1657,17 +1665,19 @@ const VIEWS = [
 ];
 
 function Shell() {
-  const { loading, isAdmin } = useApp();
-  const { user, logout }     = useUserAuth();
+  const { loading, isAdmin, isMobile } = useApp();
+  const { user, logout }               = useUserAuth();
   const [view,      setView]      = useState("home");
   const [showAuth,  setShowAuth]  = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "Georgia, serif", color: T.muted, background: T.bg }}>
-      Connexion à l'API…
+      Chargement…
     </div>
   );
+
+  const adminBtnBottom = isMobile ? 70 : 20;
 
   return (
     <div style={{ fontFamily: '"EB Garamond", Georgia, serif', background: T.bg, minHeight: "100vh", color: T.dark }}>
@@ -1680,42 +1690,51 @@ function Shell() {
         ::-webkit-scrollbar-thumb { background: ${T.gold}; border-radius: 4px; }
       `}</style>
 
-      <header style={{ background: T.dark, color: "#FAF3E4", padding: "0 24px", display: "flex", alignItems: "stretch", justifyContent: "space-between", height: 64 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <span style={{ fontSize: 26 }}>🥖</span>
-          <div>
-            <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, fontWeight: 900, lineHeight: 1.1 }}>Loafly</div>
-            <div style={{ fontSize: 11, color: T.gold, fontStyle: "italic" }}>Boulangeries artisanales · Montréal</div>
+      {/* ── Header ── */}
+      <header style={{ background: T.dark, color: "#FAF3E4", padding: isMobile ? "0 16px" : "0 24px", display: "flex", alignItems: "stretch", justifyContent: "space-between", height: 58, position: "sticky", top: 0, zIndex: 150 }}>
+        <button onClick={() => setView("home")} style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", color: "#FAF3E4", cursor: "pointer", padding: 0 }}>
+          <span style={{ fontSize: 22 }}>🥖</span>
+          <div style={{ textAlign: "left" }}>
+            <div style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 17 : 20, fontWeight: 900, lineHeight: 1.1 }}>Loafly</div>
+            {!isMobile && <div style={{ fontSize: 11, color: T.gold, fontStyle: "italic" }}>Boulangeries artisanales · Montréal</div>}
           </div>
-        </div>
+        </button>
 
         <div style={{ display: "flex", alignItems: "stretch", gap: 2 }}>
-          <nav style={{ display: "flex", alignItems: "stretch", gap: 2 }}>
-            {VIEWS.map(({ id, icon, label }) => (
-              <button key={id} onClick={() => setView(id)}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 18px", border: "none", background: view === id ? `${T.gold}22` : "transparent", color: view === id ? T.gold : "#FAF3E470", borderBottom: `2px solid ${view === id ? T.gold : "transparent"}`, fontSize: 14, cursor: "pointer", transition: "all 0.18s" }}>
-                <span style={{ fontSize: 15 }}>{icon}</span> {label}
-              </button>
-            ))}
-          </nav>
+          {/* Nav desktop uniquement */}
+          {!isMobile && (
+            <nav style={{ display: "flex", alignItems: "stretch", gap: 2 }}>
+              {VIEWS.map(({ id, icon, label }) => (
+                <button key={id} onClick={() => setView(id)}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 16px", border: "none", background: view === id ? `${T.gold}22` : "transparent", color: view === id ? T.gold : "#FAF3E470", borderBottom: `2px solid ${view === id ? T.gold : "transparent"}`, fontSize: 14, cursor: "pointer", transition: "all 0.18s" }}>
+                  <span style={{ fontSize: 15 }}>{icon}</span> {label}
+                </button>
+              ))}
+            </nav>
+          )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 16, borderLeft: `1px solid #FFFFFF18` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: isMobile ? 0 : 16, borderLeft: isMobile ? "none" : `1px solid #FFFFFF18` }}>
             {user ? (
               <>
-                <span style={{ fontSize: 13, color: T.gold }}>@{user.username}</span>
-                <button onClick={logout} style={{ background: "none", border: `1px solid #FFFFFF30`, color: "#FAF3E470", padding: "5px 12px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Déconnexion</button>
+                {!isMobile && <span style={{ fontSize: 13, color: T.gold }}>@{user.username}</span>}
+                <button onClick={logout} style={{ background: "none", border: `1px solid #FFFFFF30`, color: "#FAF3E470", padding: "5px 10px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>
+                  {isMobile ? "↪" : "Déconnexion"}
+                </button>
               </>
             ) : (
-              <button onClick={() => setShowAuth(true)} style={{ background: T.gold, border: "none", color: "white", padding: "7px 16px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Se connecter</button>
+              <button onClick={() => setShowAuth(true)} style={{ background: T.gold, border: "none", color: "white", padding: "7px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                {isMobile ? "Connexion" : "Se connecter"}
+              </button>
             )}
           </div>
         </div>
       </header>
 
-      <main>
+      {/* ── Contenu principal ── */}
+      <main style={{ paddingBottom: isMobile ? 64 : 0 }}>
         {view === "home" && <HomeView onNavigate={setView} onShowAuth={() => setShowAuth(true)} />}
         {view !== "home" && (
-          <div style={{ padding: "32px", maxWidth: 1080, margin: "0 auto" }}>
+          <div style={{ padding: isMobile ? "16px" : "32px", maxWidth: 1080, margin: "0 auto" }}>
             {view === "rankings" && <RankingsView />}
             {view === "bakeries" && <BakeriesView />}
             {view === "map"      && <MapView />}
@@ -1723,24 +1742,40 @@ function Shell() {
         )}
       </main>
 
+      {/* ── Footer (desktop seulement) ── */}
+      {!isMobile && <Footer />}
+
+      {/* ── Panel admin ── */}
       {showAdmin && (
         <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(28,15,7,0.7)", overflowY: "auto" }}>
-          <div style={{ background: T.bg, minHeight: "100vh", padding: 32, maxWidth: 1080, margin: "0 auto", position: "relative" }}>
-            <button onClick={() => setShowAdmin(false)} style={{ position: "absolute", top: 24, right: 24, background: "none", border: "none", fontSize: 28, color: T.muted, cursor: "pointer" }}>×</button>
+          <div style={{ background: T.bg, minHeight: "100vh", padding: isMobile ? 16 : 32, maxWidth: 1080, margin: "0 auto", position: "relative" }}>
+            <button onClick={() => setShowAdmin(false)} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", fontSize: 28, color: T.muted, cursor: "pointer" }}>×</button>
             <AdminView />
           </div>
         </div>
       )}
 
-      <Footer />
-
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
 
+      {/* ── Bouton admin (flottant) ── */}
       <button onClick={() => setShowAdmin(true)} title="Admin"
-        style={{ position: "fixed", bottom: 20, right: 20, background: T.dark, border: `1px solid ${T.gold}44`, color: `${T.gold}88`, width: 36, height: 36, borderRadius: "50%", fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", zIndex: 100 }}>
+        style={{ position: "fixed", bottom: adminBtnBottom, right: 16, background: T.dark, border: `1px solid ${T.gold}44`, color: `${T.gold}88`, width: 34, height: 34, borderRadius: "50%", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", zIndex: 200 }}>
         🔐
       </button>
-      {isAdmin && <span style={{ position: "fixed", bottom: 48, right: 22, width: 8, height: 8, borderRadius: "50%", background: "#2C6E2C", zIndex: 101 }} />}
+      {isAdmin && <span style={{ position: "fixed", bottom: adminBtnBottom + 26, right: 19, width: 8, height: 8, borderRadius: "50%", background: "#2C6E2C", zIndex: 201 }} />}
+
+      {/* ── Navigation mobile en bas ── */}
+      {isMobile && (
+        <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: T.dark, borderTop: `1px solid ${T.gold}33`, display: "flex", zIndex: 190, height: 58 }}>
+          {VIEWS.map(({ id, icon, label }) => (
+            <button key={id} onClick={() => setView(id)}
+              style={{ flex: 1, background: view === id ? `${T.gold}18` : "none", border: "none", borderTop: `2px solid ${view === id ? T.gold : "transparent"}`, color: view === id ? T.gold : "#FAF3E450", fontSize: 9, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, padding: "6px 2px 8px" }}>
+              <span style={{ fontSize: 19 }}>{icon}</span>
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
     </div>
   );
 }
