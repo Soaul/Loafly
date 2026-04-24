@@ -625,6 +625,88 @@ function ScoreBar({ label, score }) {
   );
 }
 
+function BaguetteLoader() {
+  const [pct, setPct] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const duration = 4000;
+    const tick = () => {
+      const elapsed = Date.now() - start;
+      const raw = elapsed / duration;
+      setPct(Math.min(raw < 0.7 ? raw * 1.1 : 0.77 + (raw - 0.7) * 0.5, 0.95));
+      if (elapsed < duration * 1.5) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, []);
+
+  const w = 220;
+  const filled = Math.round(pct * w);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: T.bg, gap: 24, fontFamily: '"EB Garamond", Georgia, serif' }}>
+      <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 28, fontWeight: 900, color: T.dark, letterSpacing: "-0.01em" }}>
+        Loafly
+      </div>
+      <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.15em", marginTop: -16 }}>
+        Boulangeries artisanales · Montréal
+      </div>
+
+      {/* Baguette SVG */}
+      <svg width={w + 40} height={56} viewBox={`0 0 ${w + 40} 56`} style={{ overflow: "visible" }}>
+        <defs>
+          <clipPath id="baguette-fill">
+            <rect x={20} y={0} width={filled} height={56} />
+          </clipPath>
+          <linearGradient id="crust-grad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#8B5C2A" />
+            <stop offset="100%" stopColor="#C8912A" />
+          </linearGradient>
+          <linearGradient id="crumb-grad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#E8B84B" />
+            <stop offset="100%" stopColor="#F5CC6A" />
+          </linearGradient>
+        </defs>
+
+        {/* Baguette vide (fond) */}
+        <g opacity="0.18">
+          <ellipse cx={20} cy={28} rx={10} ry={14} fill="#C8912A" />
+          <rect x={20} y={14} width={w} height={28} fill="#C8912A" />
+          <ellipse cx={20 + w} cy={28} rx={6} ry={10} fill="#C8912A" />
+        </g>
+
+        {/* Baguette remplie */}
+        <g clipPath="url(#baguette-fill)">
+          {/* Corps */}
+          <ellipse cx={20} cy={28} rx={10} ry={14} fill="url(#crust-grad)" />
+          <rect x={20} y={14} width={w} height={28} fill="url(#crust-grad)" />
+          <ellipse cx={20 + w} cy={28} rx={6} ry={10} fill="#A06820" />
+          {/* Mie (bande claire) */}
+          <rect x={20} y={20} width={w} height={16} fill="url(#crumb-grad)" opacity="0.55" rx={4} />
+          {/* Grignes (entailles) */}
+          {[0.2, 0.38, 0.56, 0.74].map((p, i) => (
+            <line key={i}
+              x1={20 + p * w} y1={16}
+              x2={20 + p * w + 18} y2={38}
+              stroke="#8B5520" strokeWidth={2.5} strokeLinecap="round" opacity={0.6}
+            />
+          ))}
+          {/* Reflet */}
+          <rect x={20} y={16} width={w} height={5} fill="white" opacity={0.12} rx={2} />
+        </g>
+
+        {/* Contour */}
+        <ellipse cx={20} cy={28} rx={10} ry={14} fill="none" stroke="#C8912A" strokeWidth={1.5} opacity={0.35} />
+        <rect x={20} y={14} width={w} height={28} fill="none" stroke="#C8912A" strokeWidth={1.5} opacity={0.35} />
+        <ellipse cx={20 + w} cy={28} rx={6} ry={10} fill="none" stroke="#C8912A" strokeWidth={1.5} opacity={0.35} />
+      </svg>
+
+      <div style={{ fontSize: 13, color: T.muted, fontStyle: "italic" }}>
+        {pct < 0.3 ? "Pétrissage en cours…" : pct < 0.6 ? "Mise en forme…" : pct < 0.85 ? "Enfournement…" : "Presque prêt !"}
+      </div>
+    </div>
+  );
+}
+
 function Spinner() {
   return <div style={{ textAlign: "center", padding: 40, color: T.muted, fontStyle: "italic" }}>Chargement…</div>;
 }
@@ -1012,24 +1094,27 @@ function EditBakeryModal({ bakery, onClose, onSave }) {
 //  views/BakeriesView
 // ─────────────────────────────────────────────────────────────────────────────
 
-function BakeriesView() {
+function BakeriesView({ onShowAuth }) {
   const { productTypes, isAdmin, user, isMobile }             = useApp();
   const { bakeries, addBakery, updateBakery, removeBakery }   = useBakeries();
-  const canAddBakery = isAdmin || !!user;
   const { submitRating }                                      = useRatings();
 
-  const [selectedId,    setSelectedId]    = useState(null);
-  const [bakeryDetail,  setBakeryDetail]  = useState(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [showAddBakery, setShowAddBakery] = useState(false);
+  const [selectedId,     setSelectedId]     = useState(null);
+  const [bakeryDetail,   setBakeryDetail]   = useState(null);
+  const [loadingDetail,  setLoadingDetail]  = useState(false);
+  const [showAddBakery,  setShowAddBakery]  = useState(false);
   const [showEditBakery, setShowEditBakery] = useState(false);
-  const [showAddRating, setShowAddRating] = useState(false);
-  const [filterNeighborhood, setFilterNeighborhood] = useState("");
+  const [showAddRating,  setShowAddRating]  = useState(false);
+  const [search,         setSearch]         = useState("");
 
   const selected = bakeries.find((b) => b.id === selectedId);
-  const filtered = filterNeighborhood
-    ? bakeries.filter((b) => b.neighborhood?.toLowerCase().includes(filterNeighborhood.toLowerCase()))
-    : bakeries;
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? bakeries.filter((b) =>
+        b.name.toLowerCase().includes(q) ||
+        b.neighborhood?.toLowerCase().includes(q)
+      )
+    : [...bakeries].sort((a, b) => (b.rating_count ?? 0) - (a.rating_count ?? 0));
 
   useEffect(() => {
     if (!selectedId) { setBakeryDetail(null); return; }
@@ -1069,103 +1154,142 @@ function BakeriesView() {
     setBakeryDetail(null);
   };
 
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "300px 1fr", gap: isMobile ? 16 : 28, alignItems: "start" }}>
-      {/* ── Colonne gauche : filtre + liste ── */}
-      <div>
-        {canAddBakery && (
-          <button onClick={() => setShowAddBakery(true)} style={{ ...css.btnDark, width: "100%", marginBottom: 12 }}>
-            + Ajouter une boulangerie
-          </button>
-        )}
+  const BakeryList = () => (
+    <div>
+      {/* Barre de recherche */}
+      <div style={{ position: "relative", marginBottom: 12 }}>
+        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 15, pointerEvents: "none" }}>🔍</span>
+        <input
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setSelectedId(null); }}
+          placeholder="Rechercher une boulangerie ou un quartier…"
+          style={{ ...css.input, paddingLeft: 38 }}
+        />
+      </div>
 
-        <select
-          value={filterNeighborhood}
-          onChange={(e) => { setFilterNeighborhood(e.target.value); setSelectedId(null); }}
-          style={{ ...css.input, marginBottom: 14, fontSize: 13 }}
-        >
-          <option value="">Tous les quartiers</option>
-          {MONTREAL_NEIGHBORHOODS.map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
+      {isAdmin && (
+        <button onClick={() => setShowAddBakery(true)} style={{ ...css.btnDark, width: "100%", marginBottom: 12 }}>
+          + Ajouter une boulangerie
+        </button>
+      )}
 
-        {filtered.length === 0 && (
-          <p style={{ color: T.muted, fontStyle: "italic", fontSize: 14 }}>
-            {filterNeighborhood ? `Aucune boulangerie à ${filterNeighborhood}.` : "Aucune boulangerie."}
-          </p>
-        )}
-        {filtered.map((b) => (
+      <div style={{ maxHeight: isMobile ? "none" : "calc(100vh - 260px)", overflowY: "auto", paddingRight: 2 }}>
+        {filtered.length === 0 ? (
+          <p style={{ color: T.muted, fontStyle: "italic", fontSize: 14, padding: "12px 0" }}>Aucune boulangerie trouvée.</p>
+        ) : filtered.map((b) => (
           <div key={b.id} onClick={() => setSelectedId(b.id)}
-            style={{ padding: "12px 16px", marginBottom: 8, borderRadius: 10, cursor: "pointer", background: selectedId === b.id ? T.dark : "white", color: selectedId === b.id ? "#FAF3E4" : T.dark, border: `2px solid ${selectedId === b.id ? T.gold : T.border}`, transition: "all 0.2s" }}>
+            style={{ padding: "12px 16px", marginBottom: 8, borderRadius: 10, cursor: "pointer", background: selectedId === b.id ? T.dark : "white", color: selectedId === b.id ? "#FAF3E4" : T.dark, border: `2px solid ${selectedId === b.id ? T.gold : T.border}`, transition: "all 0.15s" }}>
             <div style={{ fontFamily: '"Playfair Display", serif', fontWeight: 600, fontSize: 15 }}>{b.name}</div>
             {b.neighborhood && <div style={{ fontSize: 12, opacity: 0.65, marginTop: 2 }}>{b.neighborhood}</div>}
-            <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>{b.rating_count ?? 0} avis</div>
+            <div style={{ fontSize: 12, opacity: 0.5, marginTop: 3 }}>{b.rating_count ?? 0} avis</div>
           </div>
         ))}
       </div>
+    </div>
+  );
 
-      {/* ── Colonne droite : détail ── */}
-      <div>
-        {!selected ? <EmptyState emoji="🏪" text="Sélectionnez une boulangerie" /> : loadingDetail ? <Spinner /> : bakeryDetail && (
-          <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, gap: 12, flexWrap: "wrap" }}>
-              <div style={{ minWidth: 0 }}>
-                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 20 : 24, color: T.dark }}>{bakeryDetail.name}</h2>
-                {bakeryDetail.neighborhood && <p style={{ color: T.muted, marginTop: 4 }}>{bakeryDetail.neighborhood}</p>}
-                {bakeryDetail.address && <p style={{ color: T.muted, fontSize: 13 }}>{bakeryDetail.address}</p>}
+  const BakeryDetail = () => (
+    <>
+      {/* En-tête avec infos + bouton notation */}
+      <div style={{ background: T.dark, borderRadius: 16, padding: isMobile ? "20px 18px" : "24px 28px", marginBottom: 20, color: "#FAF3E4" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ minWidth: 0 }}>
+            <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 20 : 24, color: "#FAF3E4" }}>{bakeryDetail.name}</h2>
+            {bakeryDetail.neighborhood && <p style={{ color: `${T.gold}CC`, marginTop: 4, fontSize: 14 }}>{bakeryDetail.neighborhood}</p>}
+            {bakeryDetail.address && <p style={{ color: "#FAF3E460", fontSize: 12, marginTop: 2 }}>{bakeryDetail.address}</p>}
+          </div>
+          {isAdmin && (
+            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+              <button onClick={() => setShowEditBakery(true)} style={{ ...css.btnSm, background: "#FFFFFF15", color: "#FAF3E4CC", border: "1px solid #FFFFFF20" }}>✏️ Modifier</button>
+              <button onClick={handleDelete} style={{ ...css.btnGhost, color: "#FAF3E460", border: "1px solid #FFFFFF15" }}>Supprimer</button>
+            </div>
+          )}
+        </div>
+
+        {/* CTA notation */}
+        <div style={{ marginTop: 18 }}>
+          {user ? (
+            <button onClick={() => setShowAddRating(true)}
+              style={{ ...css.btnGold, width: "auto", padding: "11px 28px", fontSize: 15 }}>
+              ★ Donner mon avis
+            </button>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, color: "#FAF3E480", fontStyle: "italic" }}>Connectez-vous pour laisser un avis</span>
+              <button onClick={onShowAuth}
+                style={{ ...css.btnGold, width: "auto", padding: "9px 22px", fontSize: 14 }}>
+                Se connecter
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {(!bakeryDetail.products || bakeryDetail.products.length === 0) ? (
+        <EmptyState text="Aucun avis pour cette boulangerie." />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {bakeryDetail.products.map(({ product_type, aggregated_scores, overall_average, rating_count, individual_ratings }) => (
+            <div key={product_type.id} style={{ background: "white", borderRadius: 14, padding: 22, border: `1px solid ${T.border}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <span style={{ fontFamily: '"Playfair Display", serif', fontSize: 17 }}>{product_type.emoji} {product_type.name}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ background: `${T.gold}22`, color: T.gold, border: `1px solid ${T.gold}55`, padding: "3px 10px", borderRadius: 20, fontSize: 12 }}>{rating_count} avis</span>
+                  <span style={{ background: T.gold, color: "white", padding: "4px 14px", borderRadius: 20, fontSize: 14, fontWeight: 600 }}>⌀ {overall_average.toFixed(2)} / 5</span>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flexShrink: 0 }}>
-                <button onClick={() => setShowAddRating(true)} style={{ ...css.btnDark, background: T.gold }}>★ Donner mon avis</button>
-                {isAdmin && (
-                  <>
-                    <button onClick={() => setShowEditBakery(true)} style={css.btnSm}>✏️ Modifier</button>
-                    <button onClick={handleDelete} style={css.btnGhost}>Supprimer</button>
-                  </>
-                )}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, marginBottom: 16 }}>
+                {Object.entries(aggregated_scores).map(([name, score]) => <ScoreBar key={name} label={name} score={score} />)}
+              </div>
+              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 14 }}>
+                <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Avis individuels</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {individual_ratings.map((r) => (
+                    <div key={r.id} style={{ background: T.bg, borderRadius: 8, padding: "10px 14px", display: "flex", gap: 12 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: T.dark, display: "flex", alignItems: "center", justifyContent: "center", color: T.gold, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                        {(r.author_name || "A")[0].toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: T.dark }}>{r.author_name}</span>
+                          <span style={{ fontSize: 12, color: T.gold, fontWeight: 600 }}>{(Object.values(r.scores).reduce((a, b) => a + b, 0) / Object.values(r.scores).length).toFixed(1)}/5</span>
+                        </div>
+                        {r.note && <p style={{ fontSize: 13, color: T.muted, fontStyle: "italic", marginTop: 4 }}>« {r.note} »</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
 
-            {(!bakeryDetail.products || bakeryDetail.products.length === 0) ? (
-              <EmptyState text="Aucun avis pour cette boulangerie." />
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                {bakeryDetail.products.map(({ product_type, aggregated_scores, overall_average, rating_count, individual_ratings }) => (
-                  <div key={product_type.id} style={{ background: "white", borderRadius: 14, padding: 22, border: `1px solid ${T.border}` }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                      <span style={{ fontFamily: '"Playfair Display", serif', fontSize: 17 }}>{product_type.emoji} {product_type.name}</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ background: `${T.gold}22`, color: T.gold, border: `1px solid ${T.gold}55`, padding: "3px 10px", borderRadius: 20, fontSize: 12 }}>{rating_count} avis</span>
-                        <span style={{ background: T.gold, color: "white", padding: "4px 14px", borderRadius: 20, fontSize: 14, fontWeight: 600 }}>⌀ {overall_average.toFixed(2)} / 5</span>
-                      </div>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, marginBottom: 16 }}>
-                      {Object.entries(aggregated_scores).map(([name, score]) => <ScoreBar key={name} label={name} score={score} />)}
-                    </div>
-                    <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 14 }}>
-                      <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Avis individuels</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {individual_ratings.map((r) => (
-                          <div key={r.id} style={{ background: T.bg, borderRadius: 8, padding: "10px 14px", display: "flex", gap: 12 }}>
-                            <div style={{ width: 32, height: 32, borderRadius: "50%", background: T.dark, display: "flex", alignItems: "center", justifyContent: "center", color: T.gold, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                              {(r.author_name || "A")[0].toUpperCase()}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: T.dark }}>{r.author_name}</span>
-                                <span style={{ fontSize: 12, color: T.gold, fontWeight: 600 }}>{(Object.values(r.scores).reduce((a, b) => a + b, 0) / Object.values(r.scores).length).toFixed(1)}/5</span>
-                              </div>
-                              {r.note && <p style={{ fontSize: 13, color: T.muted, fontStyle: "italic", marginTop: 4 }}>« {r.note} »</p>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+  return (
+    <div>
+      {isMobile && selectedId ? (
+        <div>
+          <button onClick={() => { setSelectedId(null); setBakeryDetail(null); }}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 14, padding: "0 0 16px", fontFamily: "inherit" }}>
+            ← Retour à la liste
+          </button>
+          {loadingDetail ? <Spinner /> : bakeryDetail && <BakeryDetail />}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "300px 1fr", gap: 28, alignItems: "start" }}>
+          <BakeryList />
+          {!isMobile && (
+            <div>
+              {!selected
+                ? <EmptyState emoji="🏪" text="Sélectionnez une boulangerie dans la liste" />
+                : loadingDetail ? <Spinner />
+                : bakeryDetail && <BakeryDetail />}
+            </div>
+          )}
+        </div>
+      )}
 
       {showAddBakery  && <AddBakeryModal onClose={() => setShowAddBakery(false)} onSave={handleAddBakery} />}
       {showEditBakery && bakeryDetail && <EditBakeryModal bakery={bakeryDetail} onClose={() => setShowEditBakery(false)} onSave={handleEditBakery} />}
@@ -1772,11 +1896,7 @@ function Shell() {
   const [showAuth,  setShowAuth]  = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
 
-  if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "Georgia, serif", color: T.muted, background: T.bg }}>
-      Chargement…
-    </div>
-  );
+  if (loading) return <BaguetteLoader />;
 
   const adminBtnBottom = isMobile ? 78 : 20;
 
@@ -1844,7 +1964,7 @@ function Shell() {
         {view !== "home" && (
           <div style={{ padding: isMobile ? "16px" : "32px", maxWidth: 1080, margin: "0 auto" }}>
             {view === "rankings" && <RankingsView />}
-            {view === "bakeries" && <BakeriesView />}
+            {view === "bakeries" && <BakeriesView onShowAuth={() => setShowAuth(true)} />}
             {view === "map"      && <MapView />}
           </div>
         )}
