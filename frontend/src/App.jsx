@@ -639,66 +639,26 @@ function BaguetteLoader() {
     requestAnimationFrame(tick);
   }, []);
 
-  const w = 220;
-  const filled = Math.round(pct * w);
+  const emojiSize = 80;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: T.bg, gap: 24, fontFamily: '"EB Garamond", Georgia, serif' }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: T.bg, gap: 20, fontFamily: '"EB Garamond", Georgia, serif' }}>
       <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 28, fontWeight: 900, color: T.dark, letterSpacing: "-0.01em" }}>
         Loafly
       </div>
-      <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.15em", marginTop: -16 }}>
+      <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.15em", marginTop: -12 }}>
         Boulangeries artisanales · Montréal
       </div>
 
-      {/* Baguette SVG */}
-      <svg width={w + 40} height={56} viewBox={`0 0 ${w + 40} 56`} style={{ overflow: "visible" }}>
-        <defs>
-          <clipPath id="baguette-fill">
-            <rect x={20} y={0} width={filled} height={56} />
-          </clipPath>
-          <linearGradient id="crust-grad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#8B5C2A" />
-            <stop offset="100%" stopColor="#C8912A" />
-          </linearGradient>
-          <linearGradient id="crumb-grad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#E8B84B" />
-            <stop offset="100%" stopColor="#F5CC6A" />
-          </linearGradient>
-        </defs>
-
-        {/* Baguette vide (fond) */}
-        <g opacity="0.18">
-          <ellipse cx={20} cy={28} rx={10} ry={14} fill="#C8912A" />
-          <rect x={20} y={14} width={w} height={28} fill="#C8912A" />
-          <ellipse cx={20 + w} cy={28} rx={6} ry={10} fill="#C8912A" />
-        </g>
-
-        {/* Baguette remplie */}
-        <g clipPath="url(#baguette-fill)">
-          {/* Corps */}
-          <ellipse cx={20} cy={28} rx={10} ry={14} fill="url(#crust-grad)" />
-          <rect x={20} y={14} width={w} height={28} fill="url(#crust-grad)" />
-          <ellipse cx={20 + w} cy={28} rx={6} ry={10} fill="#A06820" />
-          {/* Mie (bande claire) */}
-          <rect x={20} y={20} width={w} height={16} fill="url(#crumb-grad)" opacity="0.55" rx={4} />
-          {/* Grignes (entailles) */}
-          {[0.2, 0.38, 0.56, 0.74].map((p, i) => (
-            <line key={i}
-              x1={20 + p * w} y1={16}
-              x2={20 + p * w + 18} y2={38}
-              stroke="#8B5520" strokeWidth={2.5} strokeLinecap="round" opacity={0.6}
-            />
-          ))}
-          {/* Reflet */}
-          <rect x={20} y={16} width={w} height={5} fill="white" opacity={0.12} rx={2} />
-        </g>
-
-        {/* Contour */}
-        <ellipse cx={20} cy={28} rx={10} ry={14} fill="none" stroke="#C8912A" strokeWidth={1.5} opacity={0.35} />
-        <rect x={20} y={14} width={w} height={28} fill="none" stroke="#C8912A" strokeWidth={1.5} opacity={0.35} />
-        <ellipse cx={20 + w} cy={28} rx={6} ry={10} fill="none" stroke="#C8912A" strokeWidth={1.5} opacity={0.35} />
-      </svg>
+      {/* Emoji baguette qui se révèle de gauche à droite */}
+      <div style={{ position: "relative", fontSize: emojiSize, lineHeight: 1, userSelect: "none" }}>
+        {/* Fond faded */}
+        <span style={{ opacity: 0.15 }}>🥖</span>
+        {/* Révélation progressive via overflow hidden */}
+        <span style={{ position: "absolute", inset: 0, overflow: "hidden", display: "block", width: `${pct * 100}%` }}>
+          🥖
+        </span>
+      </div>
 
       <div style={{ fontSize: 13, color: T.muted, fontStyle: "italic" }}>
         {pct < 0.3 ? "Pétrissage en cours…" : pct < 0.6 ? "Mise en forme…" : pct < 0.85 ? "Enfournement…" : "Presque prêt !"}
