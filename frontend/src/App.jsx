@@ -137,6 +137,16 @@ const ApiClient = {
     overall: () =>
       apiFetch("/rankings/overall"),
   },
+
+  // ── Requests ──────────────────────────────────────────────────────────────
+  requests: {
+    create: (payload, userToken) =>
+      apiFetch("/requests/", { method: "POST", body: JSON.stringify(payload) }, null, userToken),
+    list: (adminPin) =>
+      apiFetch("/requests/", {}, adminPin),
+    updateStatus: (id, status, adminPin) =>
+      apiFetch(`/requests/${id}`, { method: "PUT", body: JSON.stringify({ status }) }, adminPin),
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -746,12 +756,13 @@ function AddRatingModal({ bakery, productTypes, defaultPtId, onClose, onSave }) 
   );
 }
 
-function ProductRankingView({ forcedPtId }) {
-  const { productTypes }                                          = useApp();
+function ProductRankingView({ forcedPtId, onShowAuth }) {
+  const { productTypes, user }                                    = useApp();
   const { submitRating }                                          = useRatings();
   const { productRanking, loadingProduct, fetchProductRanking }   = useRankings();
   const ptId = forcedPtId;
   const [ratingTarget, setRatingTarget] = useState(null);
+  const handleRate = (bakery) => { if (!user) { onShowAuth?.(); return; } setRatingTarget(bakery); };
   const medals = ["🥇", "🥈", "🥉"];
 
   useEffect(() => {
@@ -810,7 +821,7 @@ function ProductRankingView({ forcedPtId }) {
                       {pt.criteria.map((c) => (
                         <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 12, color: "#4A3020", whiteSpace: "nowrap", minWidth: 90 }}>{c.name}</span>
-                          <div style={{ flex: 1, background: "#F0E8D5", borderRadius: 99, height: 5, overflow: "hidden" }}>
+                          <div style={{ flex: 1, background: "#F0E8D5", borderRadius: 99, height: 8, overflow: "hidden" }}>
                             <div style={{ width: `${(aggregated_scores[c.name] ?? 0) * 20}%`, height: "100%", background: `linear-gradient(90deg, ${T.gold}, #E8B84B)`, borderRadius: 99 }} />
                           </div>
                           <span style={{ fontSize: 11, color: T.gold, fontWeight: 600, minWidth: 28 }}>{(aggregated_scores[c.name] ?? 0).toFixed(1)}</span>
@@ -822,7 +833,7 @@ function ProductRankingView({ forcedPtId }) {
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontSize: 28, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>{overall_average.toFixed(1)}</div>
                   <div style={{ fontSize: 11, color: T.muted, marginBottom: 8 }}>{rating_count} avis</div>
-                  <button onClick={() => setRatingTarget(bakery)} style={css.btnSm}>★ Évaluer</button>
+                  <button onClick={() => handleRate(bakery)} style={css.btnSm}>★ Évaluer</button>
                 </div>
               </div>
             ))}
@@ -837,12 +848,13 @@ function ProductRankingView({ forcedPtId }) {
   );
 }
 
-function OverallRankingView() {
-  const { productTypes }                                      = useApp();
+function OverallRankingView({ onShowAuth }) {
+  const { productTypes, user }                                = useApp();
   const { submitRating }                                      = useRatings();
   const { overallRanking, loadingOverall, fetchOverallRanking } = useRankings();
   const [ratingTarget, setRatingTarget] = useState(null);
   const medals = ["🥇", "🥈", "🥉"];
+  const handleRate = (bakery) => { if (!user) { onShowAuth?.(); return; } setRatingTarget(bakery); };
 
   useEffect(() => { fetchOverallRanking(); }, []);
 
@@ -903,7 +915,7 @@ function OverallRankingView() {
             <div style={{ textAlign: "right", minWidth: 80 }}>
               <div style={{ fontSize: 28, fontWeight: 700, color: T.gold, lineHeight: 1 }}>{overall_average.toFixed(1)}</div>
               <div style={{ fontSize: 11, color: T.muted }}>{total_ratings} avis</div>
-              <button onClick={() => setRatingTarget(bakery)} style={{ ...css.btnSm, marginTop: 8 }}>★ Évaluer</button>
+              <button onClick={() => handleRate(bakery)} style={{ ...css.btnSm, marginTop: 8 }}>★ Évaluer</button>
             </div>
           </div>
         ))}
@@ -916,7 +928,7 @@ function OverallRankingView() {
   );
 }
 
-function RankingsView() {
+function RankingsView({ onShowAuth }) {
   const { productTypes } = useApp();
   const [sub, setSub] = useState("overall");
   const [ptId, setPtId] = useState(null);
@@ -928,6 +940,10 @@ function RankingsView() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useEffect(() => {
+    if (productTypes.length > 0 && !ptId) setPtId(productTypes[0].id);
+  }, [productTypes]);
 
   const selectedPt = productTypes.find((p) => p.id === ptId);
 
@@ -965,9 +981,9 @@ function RankingsView() {
         </div>
       </div>
 
-      {sub === "product" && ptId && <ProductRankingView forcedPtId={ptId} />}
+      {sub === "product" && ptId && <ProductRankingView forcedPtId={ptId} onShowAuth={onShowAuth} />}
       {sub === "product" && !ptId && <EmptyState text="Choisissez un produit dans le menu." />}
-      {sub === "overall" && <OverallRankingView />}
+      {sub === "overall" && <OverallRankingView onShowAuth={onShowAuth} />}
     </div>
   );
 }
@@ -1012,7 +1028,13 @@ function AddBakeryModal({ onClose, onSave }) {
 }
 
 function EditBakeryModal({ bakery, onClose, onSave }) {
-  const [f, setF]       = useState({ name: bakery.name, neighborhood: bakery.neighborhood ?? "", address: bakery.address ?? "" });
+  const [f, setF] = useState({
+    name:         bakery.name,
+    neighborhood: bakery.neighborhood ?? "",
+    address:      bakery.address ?? "",
+    lat:          bakery.lat != null ? String(bakery.lat) : "",
+    lng:          bakery.lng != null ? String(bakery.lng) : "",
+  });
   const [errors, setErrors] = useState({});
   const set = (k) => (e) => { setF((p) => ({ ...p, [k]: e.target.value })); setErrors((p) => ({ ...p, [k]: false })); };
 
@@ -1021,8 +1043,14 @@ function EditBakeryModal({ bakery, onClose, onSave }) {
     if (!f.name.trim())         errs.name         = true;
     if (!f.neighborhood.trim()) errs.neighborhood  = true;
     if (!f.address.trim())      errs.address       = true;
+    if (f.lat  && isNaN(parseFloat(f.lat)))  errs.lat  = true;
+    if (f.lng  && isNaN(parseFloat(f.lng)))  errs.lng  = true;
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    onSave(f);
+    onSave({
+      ...f,
+      lat: f.lat ? parseFloat(f.lat) : null,
+      lng: f.lng ? parseFloat(f.lng) : null,
+    });
   };
 
   const inputStyle = (k) => ({ ...css.input, borderColor: errors[k] ? T.danger : undefined });
@@ -1044,7 +1072,19 @@ function EditBakeryModal({ bakery, onClose, onSave }) {
         <input value={f.address} onChange={set("address")} placeholder="Ex : 1234 rue Saint-Denis" style={inputStyle("address")} />
         {errors.address && <p style={{ color: T.danger, fontSize: 12, marginTop: 4 }}>Champ requis</p>}
       </Field>
-      <p style={{ fontSize: 12, color: T.muted, fontStyle: "italic", marginBottom: 12 }}>📍 L'adresse sera regéolocalisée automatiquement.</p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Latitude">
+          <input value={f.lat} onChange={set("lat")} placeholder="ex : 45.5231" style={inputStyle("lat")} />
+          {errors.lat && <p style={{ color: T.danger, fontSize: 12, marginTop: 4 }}>Nombre invalide</p>}
+        </Field>
+        <Field label="Longitude">
+          <input value={f.lng} onChange={set("lng")} placeholder="ex : -73.5821" style={inputStyle("lng")} />
+          {errors.lng && <p style={{ color: T.danger, fontSize: 12, marginTop: 4 }}>Nombre invalide</p>}
+        </Field>
+      </div>
+      <p style={{ fontSize: 12, color: T.muted, fontStyle: "italic", marginBottom: 12 }}>
+        📍 Montréal : latitude ~45.5 (positif), longitude ~-73.5 (négatif)
+      </p>
       <button onClick={handleSubmit} style={{ ...css.btnGold, marginTop: 4 }}>Enregistrer</button>
     </Modal>
   );
@@ -1254,12 +1294,21 @@ function BakeriesView({ onShowAuth }) {
 //  views/ModerationView
 // ─────────────────────────────────────────────────────────────────────────────
 
+const STATUS_META = {
+  pending:   { label: "En attente",  color: "#C8912A", bg: "#FFF8ED" },
+  processed: { label: "Traité",      color: "#2C6E2C", bg: "#EDF7ED" },
+  rejected:  { label: "Refusé",      color: "#B23B3B", bg: "#FDEAEA" },
+};
+
 function ModerationView() {
   const { adminPin, requestConfirm, notify } = useApp();
-  const [sub,     setSub]     = useState("ratings");
-  const [ratings, setRatings] = useState([]);
-  const [users,   setUsers]   = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [sub,      setSub]      = useState("ratings");
+  const [ratings,  setRatings]  = useState([]);
+  const [users,    setUsers]    = useState([]);
+  const [reqs,     setReqs]     = useState([]);
+  const [reqFilter, setReqFilter] = useState("all");
+  const [expanded, setExpanded] = useState(null);
+  const [loading,  setLoading]  = useState(false);
 
   const loadRatings = useCallback(async () => {
     setLoading(true);
@@ -1275,7 +1324,18 @@ function ModerationView() {
     finally { setLoading(false); }
   }, [adminPin, notify]);
 
-  useEffect(() => { sub === "ratings" ? loadRatings() : loadUsers(); }, [sub]);
+  const loadRequests = useCallback(async () => {
+    setLoading(true);
+    try { setReqs(await ApiClient.requests.list(adminPin)); }
+    catch (e) { notify(e.message, "error"); }
+    finally { setLoading(false); }
+  }, [adminPin, notify]);
+
+  useEffect(() => {
+    if (sub === "ratings") loadRatings();
+    else if (sub === "users") loadUsers();
+    else if (sub === "requests") loadRequests();
+  }, [sub]);
 
   const deleteRating = (id) => requestConfirm("Supprimer cet avis ?", async () => {
     try {
@@ -1293,10 +1353,27 @@ function ModerationView() {
     } catch (e) { notify(e.message, "error"); }
   });
 
+  const updateReqStatus = async (id, status) => {
+    try {
+      const updated = await ApiClient.requests.updateStatus(id, status, adminPin);
+      setReqs((r) => r.map((x) => x.id === id ? { ...x, status } : x));
+      notify(STATUS_META[status].label + " ✓");
+    } catch (e) { notify(e.message, "error"); }
+  };
+
+  const TYPE_ICON = { suggestion: "💡", bug: "🐞", autre: "✉️" };
+
+  const filteredReqs = reqFilter === "all" ? reqs : reqs.filter((r) => r.status === reqFilter);
+  const pendingCount = reqs.filter((r) => r.status === "pending").length;
+
   return (
     <div>
       <div style={{ display: "flex", gap: 4, background: "white", border: `1px solid ${T.border}`, borderRadius: 10, padding: 4, marginBottom: 24, width: "fit-content" }}>
-        {[["ratings", "💬 Commentaires"], ["users", "👤 Utilisateurs"]].map(([id, label]) => (
+        {[
+          ["ratings",  "💬 Commentaires"],
+          ["users",    "👤 Utilisateurs"],
+          ["requests", `📬 Demandes${pendingCount > 0 ? ` (${pendingCount})` : ""}`],
+        ].map(([id, label]) => (
           <button key={id} onClick={() => setSub(id)}
             style={{ padding: "8px 20px", border: "none", borderRadius: 7, background: sub === id ? T.dark : "transparent", color: sub === id ? "#FAF3E4" : T.muted, fontSize: 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>
             {label}
@@ -1326,7 +1403,7 @@ function ModerationView() {
             ))}
           </div>
         )
-      ) : (
+      ) : sub === "users" ? (
         users.length === 0 ? <EmptyState emoji="👤" text="Aucun utilisateur." /> : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {users.map((u) => (
@@ -1344,6 +1421,73 @@ function ModerationView() {
             ))}
           </div>
         )
+      ) : (
+        /* ── Demandes ── */
+        <div>
+          {/* Filtres statut */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+            {[["all", "Toutes"], ["pending", "En attente"], ["processed", "Traitées"], ["rejected", "Refusées"]].map(([val, label]) => (
+              <button key={val} onClick={() => setReqFilter(val)}
+                style={{ padding: "6px 16px", borderRadius: 20, border: `1.5px solid ${reqFilter === val ? T.dark : T.border}`, background: reqFilter === val ? T.dark : "white", color: reqFilter === val ? "#FAF3E4" : T.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                {label}
+                {val === "pending" && pendingCount > 0 && <span style={{ marginLeft: 6, background: T.gold, color: "white", borderRadius: 10, padding: "1px 7px", fontSize: 11 }}>{pendingCount}</span>}
+              </button>
+            ))}
+          </div>
+
+          {filteredReqs.length === 0 ? <EmptyState emoji="📬" text="Aucune demande." /> : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {filteredReqs.map((req) => {
+                const meta = STATUS_META[req.status] ?? STATUS_META.pending;
+                const isOpen = expanded === req.id;
+                return (
+                  <div key={req.id} style={{ background: "white", borderRadius: 12, border: `1px solid ${T.border}`, overflow: "hidden" }}>
+                    {/* En-tête cliquable */}
+                    <div onClick={() => setExpanded(isOpen ? null : req.id)}
+                      style={{ padding: "14px 18px", display: "flex", gap: 12, alignItems: "center", cursor: "pointer" }}>
+                      <span style={{ fontSize: 20 }}>{TYPE_ICON[req.type] ?? "✉️"}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, color: T.dark, fontSize: 14, marginBottom: 2 }}>{req.subject}</div>
+                        <div style={{ fontSize: 12, color: T.muted }}>
+                          @{req.author_name} · {new Date(req.created_at).toLocaleDateString("fr-CA")}
+                        </div>
+                      </div>
+                      <span style={{ background: meta.bg, color: meta.color, padding: "3px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
+                        {meta.label}
+                      </span>
+                      <span style={{ color: T.muted, fontSize: 18, flexShrink: 0 }}>{isOpen ? "▲" : "▼"}</span>
+                    </div>
+
+                    {/* Détail déplié */}
+                    {isOpen && (
+                      <div style={{ padding: "0 18px 18px", borderTop: `1px solid ${T.border}` }}>
+                        <p style={{ fontSize: 14, color: T.dark, lineHeight: 1.7, padding: "16px 0", whiteSpace: "pre-wrap" }}>{req.message}</p>
+                        {req.status === "pending" && (
+                          <div style={{ display: "flex", gap: 10 }}>
+                            <button onClick={() => updateReqStatus(req.id, "processed")}
+                              style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#2C6E2C", color: "white", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                              ✓ Marquer comme traité
+                            </button>
+                            <button onClick={() => updateReqStatus(req.id, "rejected")}
+                              style={{ padding: "8px 20px", borderRadius: 8, border: `1px solid ${T.border}`, background: "white", color: T.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                              Refuser
+                            </button>
+                          </div>
+                        )}
+                        {req.status !== "pending" && (
+                          <button onClick={() => updateReqStatus(req.id, "pending")}
+                            style={{ padding: "7px 16px", borderRadius: 8, border: `1px solid ${T.border}`, background: "white", color: T.muted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                            ↩ Remettre en attente
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -1462,17 +1606,165 @@ function AdminView() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  FeedbackModal  —  formulaire de demande/suggestion utilisateur
+// ─────────────────────────────────────────────────────────────────────────────
+
+function FeedbackModal({ onClose }) {
+  const { user, notify } = useApp();
+  const [form, setForm] = useState({ type: "suggestion", subject: "", message: "" });
+  const [sending, setSending] = useState(false);
+
+  const TYPE_LABELS = { suggestion: "💡 Suggestion", bug: "🐞 Bug / problème", autre: "✉️ Autre" };
+
+  const handleSubmit = async () => {
+    if (!form.subject.trim() || !form.message.trim()) {
+      notify("Sujet et message requis", "error"); return;
+    }
+    setSending(true);
+    try {
+      await ApiClient.requests.create(
+        { type: form.type, subject: form.subject, message: form.message, author_name: user.username },
+        user.token,
+      );
+      notify("Demande envoyée ! Merci pour votre retour 🙏");
+      onClose();
+    } catch (e) {
+      notify(e.message, "error");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Modal title="Envoyer un message" onClose={onClose}>
+      <p style={{ fontSize: 13, color: T.muted, marginBottom: 18 }}>
+        Une suggestion, un bug, ou autre chose ? On vous lit attentivement.
+      </p>
+
+      <Field label="Type">
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {Object.entries(TYPE_LABELS).map(([val, label]) => (
+            <button key={val} onClick={() => setForm((f) => ({ ...f, type: val }))}
+              style={{ padding: "7px 16px", borderRadius: 20, border: `1.5px solid ${form.type === val ? T.gold : T.border}`, background: form.type === val ? `${T.gold}18` : "white", color: form.type === val ? T.dark : T.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="Sujet *">
+        <input
+          value={form.subject}
+          onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
+          placeholder="Résumé en quelques mots…"
+          style={css.input}
+          maxLength={120}
+        />
+      </Field>
+
+      <Field label="Message *">
+        <textarea
+          value={form.message}
+          onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+          placeholder="Décrivez votre demande…"
+          rows={5}
+          style={{ ...css.input, resize: "vertical", height: "auto" }}
+          maxLength={2000}
+        />
+        <div style={{ fontSize: 11, color: T.muted, textAlign: "right", marginTop: 4 }}>
+          {form.message.length}/2000
+        </div>
+      </Field>
+
+      <button onClick={handleSubmit} disabled={sending} style={{ ...css.btnGold, opacity: sending ? 0.7 : 1 }}>
+        {sending ? "Envoi…" : "Envoyer"}
+      </button>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  CGUView  —  Conditions générales d'utilisation
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CGUView({ onBack }) {
+  return (
+    <div style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px 72px" }}>
+      <button onClick={onBack} style={{ ...css.btnGhost, marginBottom: 28 }}>← Retour</button>
+      <h1 style={{ fontFamily: '"Playfair Display", serif', fontSize: 28, color: T.dark, marginBottom: 8 }}>Conditions générales d'utilisation</h1>
+      <p style={{ fontSize: 13, color: T.muted, marginBottom: 32 }}>Dernière mise à jour : 22 avril 2026</p>
+
+      {[
+        ["1. Objet", "Loafly est un guide collaboratif en ligne répertoriant des boulangeries artisanales situées à Montréal, Québec. Les présentes CGU régissent l'accès et l'utilisation du site ainsi que des services associés."],
+        ["2. Accès au service", "L'accès au site est gratuit et ouvert à toute personne disposant d'une connexion internet. La création d'un compte est nécessaire pour publier des avis ou soumettre des demandes. L'inscription est réservée aux personnes majeures ou mineures avec autorisation parentale."],
+        ["3. Création de compte", "L'utilisateur s'engage à fournir des informations exactes et à jour lors de son inscription. Il est responsable de la confidentialité de ses identifiants. Loafly se réserve le droit de suspendre ou supprimer tout compte en cas de violation des présentes CGU."],
+        ["4. Contenu publié par les utilisateurs", "Les avis et commentaires publiés sur Loafly doivent être sincères, honnêtes et respectueux. Il est interdit de publier du contenu diffamatoire, injurieux, trompeur, haineux ou contraire à la législation en vigueur. Loafly se réserve le droit de supprimer tout contenu non conforme."],
+        ["5. Propriété intellectuelle", "Le contenu éditorial, la marque Loafly, le logo et l'ensemble des éléments graphiques sont la propriété exclusive de leurs auteurs respectifs. Toute reproduction sans autorisation est interdite. Les avis publiés par les utilisateurs restent leur propriété, mais ils accordent à Loafly une licence d'utilisation non exclusive pour les afficher sur la plateforme."],
+        ["6. Responsabilité", "Loafly met tout en œuvre pour assurer la fiabilité des informations, mais ne peut garantir l'exactitude des données fournies par les utilisateurs. Loafly n'est pas responsable des erreurs, omissions ou interruptions de service. La responsabilité de Loafly ne peut être engagée en cas de dommages indirects."],
+        ["7. Protection des données personnelles", "Loafly collecte uniquement les données nécessaires au fonctionnement du service (adresse courriel, nom d'utilisateur). Ces données ne sont pas transmises à des tiers à des fins commerciales. Conformément à la Loi 25 (Québec) et au RGPD (Union européenne), vous disposez d'un droit d'accès, de rectification et de suppression de vos données en nous contactant."],
+        ["8. Modification des CGU", "Loafly se réserve le droit de modifier les présentes CGU à tout moment. Les utilisateurs seront informés de toute modification substantielle. La poursuite de l'utilisation du service vaut acceptation des nouvelles conditions."],
+        ["9. Droit applicable", "Les présentes CGU sont régies par le droit en vigueur au Québec, Canada. En cas de litige, les parties s'efforceront de trouver une solution amiable avant tout recours judiciaire."],
+      ].map(([title, text]) => (
+        <div key={title} style={{ marginBottom: 28 }}>
+          <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 17, color: T.dark, marginBottom: 8 }}>{title}</h2>
+          <p style={{ fontSize: 14.5, color: T.muted, lineHeight: 1.75 }}>{text}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  MentionsView  —  Mentions légales
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MentionsView({ onBack }) {
+  return (
+    <div style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px 72px" }}>
+      <button onClick={onBack} style={{ ...css.btnGhost, marginBottom: 28 }}>← Retour</button>
+      <h1 style={{ fontFamily: '"Playfair Display", serif', fontSize: 28, color: T.dark, marginBottom: 8 }}>Mentions légales</h1>
+      <p style={{ fontSize: 13, color: T.muted, marginBottom: 32 }}>Dernière mise à jour : 22 avril 2026</p>
+
+      {[
+        ["Éditeur du site", "Le site Loafly est édité à titre personnel.\nContact : lucasreqpro@gmail.com"],
+        ["Hébergement", "Le site est hébergé par Netlify, Inc.\n44 Montgomery Street, Suite 300\nSan Francisco, CA 94104, États-Unis\nnetlify.com"],
+        ["Directeur de la publication", "Lucas Req — lucasreqpro@gmail.com"],
+        ["Données personnelles", "Conformément à la Loi 25 sur la protection des renseignements personnels dans le secteur privé (Québec) et au Règlement général sur la protection des données (RGPD), vous disposez d'un droit d'accès, de rectification et de suppression de vos données personnelles. Pour exercer ce droit, contactez-nous à : lucasreqpro@gmail.com"],
+        ["Cookies", "Loafly n'utilise pas de cookies de tracking ou publicitaires. Des cookies techniques (token d'authentification en localStorage) peuvent être utilisés pour maintenir votre session."],
+        ["Propriété intellectuelle", "L'ensemble des contenus présents sur Loafly (textes, graphismes, logo, icônes) est la propriété de leurs auteurs respectifs et est protégé par les lois relatives à la propriété intellectuelle. Toute reproduction sans autorisation expresse est interdite."],
+        ["Responsabilité", "Les informations présentes sur Loafly sont fournies à titre indicatif. Loafly ne peut être tenu responsable des erreurs ou omissions dans les données affichées, ni des dommages directs ou indirects résultant de l'utilisation du site."],
+      ].map(([title, text]) => (
+        <div key={title} style={{ marginBottom: 28 }}>
+          <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 17, color: T.dark, marginBottom: 8 }}>{title}</h2>
+          <p style={{ fontSize: 14.5, color: T.muted, lineHeight: 1.75, whiteSpace: "pre-line" }}>{text}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  Footer
 // ─────────────────────────────────────────────────────────────────────────────
 
-function Footer() {
+function Footer({ onNavigate }) {
   return (
     <footer style={{ background: T.dark, color: "#FAF3E4", padding: "40px 32px", marginTop: 64, textAlign: "center" }}>
       <div style={{ fontSize: 32, marginBottom: 10 }}>🥖</div>
       <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.gold, marginBottom: 6 }}>Loafly</div>
-      <p style={{ fontSize: 13, color: "#FAF3E444", fontStyle: "italic" }}>
-        Guide collaboratif des boulangeries artisanales · Montréal, QC · Loafly
+      <p style={{ fontSize: 13, color: "#FAF3E466", fontStyle: "italic", marginBottom: 20 }}>
+        Guide collaboratif des boulangeries artisanales · Montréal, QC
       </p>
+      <div style={{ display: "flex", justifyContent: "center", gap: 24 }}>
+        {[["cgu", "CGU"], ["mentions", "Mentions légales"]].map(([id, label]) => (
+          <button key={id} onClick={() => onNavigate(id)}
+            style={{ background: "none", border: "none", color: "#FAF3E455", fontSize: 12, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", padding: 0, transition: "color 0.15s" }}
+            onMouseEnter={(e) => e.target.style.color = "#FAF3E4BB"}
+            onMouseLeave={(e) => e.target.style.color = "#FAF3E455"}>
+            {label}
+          </button>
+        ))}
+      </div>
     </footer>
   );
 }
@@ -1660,23 +1952,38 @@ function HomeView({ onNavigate, onShowAuth }) {
           </section>
         )}
 
-        {/* ── CTA Partagez votre expertise ──────────────── */}
-        {!user && (
-          <section>
-            <div style={{ background: "white", border: `1px solid ${T.border}`, borderRadius: 16, padding: isMobile ? "24px 20px" : "28px 36px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
-              <div>
-                <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 18 : 22, color: T.dark, marginBottom: 6 }}>✍️ Partagez votre expertise</h3>
-                <p style={{ color: T.muted, fontSize: isMobile ? 13 : 14, lineHeight: 1.55, maxWidth: 480 }}>
-                  Créez un compte gratuit pour noter les boulangeries et contribuer au guide artisanal de Montréal.
-                </p>
-              </div>
-              <button onClick={onShowAuth}
-                style={{ ...css.btnGold, width: "auto", padding: "12px 28px", flexShrink: 0 }}>
-                Créer un compte
-              </button>
-            </div>
-          </section>
-        )}
+        {/* ── CTA bas de page ──────────────── */}
+        <section>
+          <div style={{ background: "white", border: `1px solid ${T.border}`, borderRadius: 16, padding: isMobile ? "24px 20px" : "28px 36px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
+            {user ? (
+              <>
+                <div>
+                  <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 18 : 22, color: T.dark, marginBottom: 6 }}>⭐ Notez une boulangerie</h3>
+                  <p style={{ color: T.muted, fontSize: isMobile ? 13 : 14, lineHeight: 1.55, maxWidth: 480 }}>
+                    Trouvez une boulangerie et partagez votre avis sur ses produits.
+                  </p>
+                </div>
+                <button onClick={() => onNavigate("bakeries")}
+                  style={{ ...css.btnGold, width: "auto", padding: "12px 28px", flexShrink: 0 }}>
+                  Choisir une boulangerie
+                </button>
+              </>
+            ) : (
+              <>
+                <div>
+                  <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 18 : 22, color: T.dark, marginBottom: 6 }}>✍️ Partagez votre expertise</h3>
+                  <p style={{ color: T.muted, fontSize: isMobile ? 13 : 14, lineHeight: 1.55, maxWidth: 480 }}>
+                    Créez un compte gratuit pour noter les boulangeries et contribuer au guide artisanal de Montréal.
+                  </p>
+                </div>
+                <button onClick={onShowAuth}
+                  style={{ ...css.btnGold, width: "auto", padding: "12px 28px", flexShrink: 0 }}>
+                  Créer un compte
+                </button>
+              </>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -1741,6 +2048,9 @@ function MapView() {
         ?.map((p) => `<span style="background:#FAF3E4;padding:3px 9px;border-radius:12px;font-size:11px;margin:2px;display:inline-block;border:1px solid #E8D5B5">${p.product_type.emoji} ${p.product_type.name} <b style="color:#C8912A">${p.average.toFixed(1)}</b></span>`)
         ?.join("") ?? "";
 
+      const mapsQuery = encodeURIComponent(b.address || b.name + " Montréal");
+      const mapsUrl   = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+
       const popup = `
         <div style="font-family:Georgia,serif;min-width:190px;padding:2px 4px">
           <div style="font-size:16px;font-weight:700;color:#2C1810;margin-bottom:2px">${b.name}</div>
@@ -1751,6 +2061,10 @@ function MapView() {
           }
           ${prods ? `<div style="line-height:2;margin-bottom:6px">${prods}</div>` : ""}
           ${b.address ? `<div style="font-size:11px;color:#8B6550;border-top:1px solid #E8D5B5;padding-top:6px;margin-top:4px">📍 ${b.address}</div>` : ""}
+          <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer"
+            style="display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:7px 14px;background:#2C1810;color:#FAF3E4;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;font-family:Georgia,serif;">
+            🗺️ Ouvrir dans Google Maps
+          </a>
         </div>`;
 
       markersRef.current.push(
@@ -1844,11 +2158,14 @@ const VIEWS = [
 function Shell() {
   const { loading, isAdmin, isMobile } = useApp();
   const { user, logout }               = useUserAuth();
-  const [view,      setView]      = useState("home");
-  const [showAuth,  setShowAuth]  = useState(false);
-  const [showAdmin, setShowAdmin] = useState(false);
+  const [view,           setView]           = useState("home");
+  const [showAuth,       setShowAuth]       = useState(false);
+  const [showAdmin,      setShowAdmin]      = useState(false);
+  const [showFeedback,   setShowFeedback]   = useState(false);
 
   if (loading) return <BaguetteLoader />;
+
+  const isLegalView = view === "cgu" || view === "mentions";
 
   const adminBtnBottom = isMobile ? 78 : 20;
 
@@ -1890,12 +2207,17 @@ function Shell() {
           )}
 
           {/* ── Auth ── */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             {user ? (
               <>
                 {!isMobile && (
                   <span style={{ fontSize: 13, color: `${T.gold}CC`, fontStyle: "italic" }}>@{user.username}</span>
                 )}
+                <button onClick={() => setShowFeedback(true)}
+                  title="Envoyer un message / suggestion"
+                  style={{ background: "none", border: "1px solid #FFFFFF22", color: "#FAF3E488", padding: isMobile ? "6px 10px" : "8px 14px", borderRadius: 8, fontSize: isMobile ? 16 : 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s", whiteSpace: "nowrap" }}>
+                  {isMobile ? "💬" : "💬 Feedback"}
+                </button>
                 <button onClick={logout} style={{ background: "none", border: "1px solid #FFFFFF22", color: "#FAF3E460", padding: isMobile ? "6px 12px" : "8px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>
                   {isMobile ? "↪" : "Déconnexion"}
                 </button>
@@ -1912,10 +2234,12 @@ function Shell() {
 
       {/* ── Contenu principal ── */}
       <main style={{ paddingBottom: isMobile ? 72 : 0 }}>
-        {view === "home" && <HomeView onNavigate={setView} onShowAuth={() => setShowAuth(true)} />}
-        {view !== "home" && (
+        {view === "home"     && <HomeView onNavigate={setView} onShowAuth={() => setShowAuth(true)} />}
+        {view === "cgu"      && <CGUView onBack={() => setView("home")} />}
+        {view === "mentions" && <MentionsView onBack={() => setView("home")} />}
+        {!isLegalView && view !== "home" && (
           <div style={{ padding: isMobile ? "16px" : "32px", maxWidth: 1080, margin: "0 auto" }}>
-            {view === "rankings" && <RankingsView />}
+            {view === "rankings" && <RankingsView onShowAuth={() => setShowAuth(true)} />}
             {view === "bakeries" && <BakeriesView onShowAuth={() => setShowAuth(true)} />}
             {view === "map"      && <MapView />}
           </div>
@@ -1923,7 +2247,7 @@ function Shell() {
       </main>
 
       {/* ── Footer (desktop seulement) ── */}
-      {!isMobile && <Footer />}
+      {!isMobile && <Footer onNavigate={setView} />}
 
       {/* ── Panel admin ── */}
       {showAdmin && (
@@ -1935,7 +2259,8 @@ function Shell() {
         </div>
       )}
 
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+      {showAuth     && <AuthModal      onClose={() => setShowAuth(false)} />}
+      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
       {/* ── Bouton admin (flottant) ── */}
       <button onClick={() => setShowAdmin(true)} title="Admin"

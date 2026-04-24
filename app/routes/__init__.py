@@ -8,6 +8,7 @@ def register_routes(app: Flask) -> None:
     from app.routes.product_types import product_types_bp
     from app.routes.rankings import rankings_bp
     from app.routes.ratings import ratings_bp
+    from app.routes.requests import requests_bp
     from app.routes.users import users_bp
 
     app.register_blueprint(auth_bp)
@@ -16,4 +17,5 @@ def register_routes(app: Flask) -> None:
     app.register_blueprint(product_types_bp)
     app.register_blueprint(rankings_bp)
     app.register_blueprint(ratings_bp)
+    app.register_blueprint(requests_bp)
     app.register_blueprint(users_bp)
