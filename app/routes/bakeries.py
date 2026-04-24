@@ -9,7 +9,7 @@ routes/bakeries.py
 
 from flask import Blueprint, request, g
 from app.database import get_db
-from app.middleware import success, error, admin_required, user_or_admin_required
+from app.middleware import success, error, admin_required
 from app.repositories import BakeryRepository, RatingRepository, ProductTypeRepository
 
 
@@ -40,7 +40,7 @@ def list_bakeries():
 
 
 @bakeries_bp.post("/")
-@user_or_admin_required
+@admin_required
 def create_bakery():
     """
     Crée une boulangerie.

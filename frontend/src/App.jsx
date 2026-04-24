@@ -388,15 +388,15 @@ function useBakeries() {
   const { bakeries, adminPin, isAdmin, user, refresh, notify, requestConfirm } = useApp();
 
   const addBakery = useCallback(async (payload) => {
-    if (!isAdmin && !user) { notify("Connectez-vous pour ajouter une boulangerie", "error"); return null; }
+    if (!isAdmin) { notify("Action réservée à l'admin", "error"); return null; }
     const coords = payload.address ? (await geocodeAddress(payload.address)) ?? {} : {};
     try {
-      const b = await ApiClient.bakeries.create({ ...payload, ...coords }, isAdmin ? adminPin : null, user?.token);
+      const b = await ApiClient.bakeries.create({ ...payload, ...coords }, adminPin);
       await refresh();
       notify("Boulangerie ajoutée !");
       return b;
     } catch (e) { notify(e.message, "error"); return null; }
-  }, [adminPin, isAdmin, user, refresh, notify]);
+  }, [adminPin, isAdmin, refresh, notify]);
 
   const updateBakery = useCallback(async (bakeryId, payload) => {
     if (!isAdmin) { notify("Action réservée à l'admin", "error"); return null; }
