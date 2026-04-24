@@ -1306,7 +1306,7 @@ function BakeriesView({ onShowAuth }) {
 //  UserProfileView  —  espace personnel : mes avis
 // ─────────────────────────────────────────────────────────────────────────────
 
-function UserProfileView({ onBack }) {
+function UserProfileView({ onBack, onShowFeedback }) {
   const { user, isMobile }   = useApp();
   const { logout }           = useUserAuth();
   const [ratings, setRatings] = useState([]);
@@ -1342,6 +1342,20 @@ function UserProfileView({ onBack }) {
         </div>
         <button onClick={logout} style={{ background: "none", border: "1px solid #FFFFFF22", color: "#FAF3E460", padding: "8px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
           Déconnexion
+        </button>
+      </div>
+
+      {/* ── Actions ── */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 28, flexWrap: "wrap" }}>
+        <button onClick={onShowFeedback}
+          style={{ display: "flex", alignItems: "center", gap: 10, background: "white", border: `1.5px solid ${T.border}`, color: T.dark, padding: "14px 22px", borderRadius: 12, cursor: "pointer", fontFamily: "inherit", fontSize: 14, flex: 1, minWidth: 200, transition: "border-color 0.18s, box-shadow 0.18s" }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = T.gold; e.currentTarget.style.boxShadow = `0 2px 12px ${T.gold}22`; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.boxShadow = "none"; }}>
+          <span style={{ fontSize: 22 }}>💬</span>
+          <div style={{ textAlign: "left" }}>
+            <div style={{ fontWeight: 600 }}>Envoyer un message</div>
+            <div style={{ fontSize: 12, color: T.muted, marginTop: 1 }}>Suggestion, bug, ou autre…</div>
+          </div>
         </button>
       </div>
 
@@ -2319,14 +2333,10 @@ function Shell() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             {user ? (
               <>
-                <button onClick={() => setView("profile")}
-                  style={{ background: "none", border: "none", color: `${T.gold}CC`, fontSize: isMobile ? 13 : 13, cursor: "pointer", fontFamily: "inherit", fontStyle: "italic", padding: isMobile ? "6px 8px" : "8px 10px", borderRadius: 8, transition: "color 0.18s" }}>
-                  {isMobile ? "👤" : `@${user.username}`}
-                </button>
-                <button onClick={() => setShowFeedback(true)}
-                  title="Envoyer un message / suggestion"
-                  style={{ background: "none", border: "1px solid #FFFFFF22", color: "#FAF3E488", padding: isMobile ? "6px 10px" : "8px 14px", borderRadius: 8, fontSize: isMobile ? 16 : 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s", whiteSpace: "nowrap" }}>
-                  {isMobile ? "💬" : "💬 Feedback"}
+                <button onClick={() => setView("profile")} title={`Mon profil — @${user.username}`}
+                  style={{ display: "flex", alignItems: "center", gap: 8, background: `${T.gold}18`, border: `1.5px solid ${T.gold}55`, color: "#FAF3E4", padding: isMobile ? "7px 10px" : "8px 14px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit", fontSize: 14, transition: "all 0.18s", flexShrink: 0 }}>
+                  <span style={{ fontSize: isMobile ? 17 : 16 }}>👤</span>
+                  {!isMobile && <span style={{ fontSize: 13, color: `${T.gold}DD`, fontStyle: "italic" }}>@{user.username}</span>}
                 </button>
                 <button onClick={logout} style={{ background: "none", border: "1px solid #FFFFFF22", color: "#FAF3E460", padding: isMobile ? "6px 12px" : "8px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>
                   {isMobile ? "↪" : "Déconnexion"}
@@ -2347,7 +2357,7 @@ function Shell() {
         {view === "home"     && <HomeView onNavigate={setView} onShowAuth={() => setShowAuth(true)} />}
         {view === "cgu"      && <CGUView onBack={() => setView("home")} />}
         {view === "mentions" && <MentionsView onBack={() => setView("home")} />}
-        {isProfileView       && <UserProfileView onBack={() => setView("home")} />}
+        {isProfileView       && <UserProfileView onBack={() => setView("home")} onShowFeedback={() => setShowFeedback(true)} />}
         {!isLegalView && !isProfileView && view !== "home" && (
           <div style={{ padding: isMobile ? "16px" : "32px", maxWidth: 1080, margin: "0 auto" }}>
             {view === "rankings" && <RankingsView onShowAuth={() => setShowAuth(true)} />}
