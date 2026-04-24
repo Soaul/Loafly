@@ -1154,9 +1154,8 @@ function BakeriesView({ onShowAuth }) {
     setBakeryDetail(null);
   };
 
-  const BakeryList = () => (
+  const bakeryListJSX = (
     <div>
-      {/* Barre de recherche */}
       <div style={{ position: "relative", marginBottom: 12 }}>
         <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 15, pointerEvents: "none" }}>🔍</span>
         <input
@@ -1188,9 +1187,8 @@ function BakeriesView({ onShowAuth }) {
     </div>
   );
 
-  const BakeryDetail = () => (
+  const bakeryDetailJSX = bakeryDetail && (
     <>
-      {/* En-tête avec infos + bouton notation */}
       <div style={{ background: T.dark, borderRadius: 16, padding: isMobile ? "20px 18px" : "24px 28px", marginBottom: 20, color: "#FAF3E4" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
           <div style={{ minWidth: 0 }}>
@@ -1205,21 +1203,15 @@ function BakeriesView({ onShowAuth }) {
             </div>
           )}
         </div>
-
-        {/* CTA notation */}
         <div style={{ marginTop: 18 }}>
           {user ? (
-            <button onClick={() => setShowAddRating(true)}
-              style={{ ...css.btnGold, width: "auto", padding: "11px 28px", fontSize: 15 }}>
+            <button onClick={() => setShowAddRating(true)} style={{ ...css.btnGold, width: "auto", padding: "11px 28px", fontSize: 15 }}>
               ★ Donner mon avis
             </button>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <span style={{ fontSize: 13, color: "#FAF3E480", fontStyle: "italic" }}>Connectez-vous pour laisser un avis</span>
-              <button onClick={onShowAuth}
-                style={{ ...css.btnGold, width: "auto", padding: "9px 22px", fontSize: 14 }}>
-                Se connecter
-              </button>
+              <button onClick={onShowAuth} style={{ ...css.btnGold, width: "auto", padding: "9px 22px", fontSize: 14 }}>Se connecter</button>
             </div>
           )}
         </div>
@@ -1275,17 +1267,17 @@ function BakeriesView({ onShowAuth }) {
             style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 14, padding: "0 0 16px", fontFamily: "inherit" }}>
             ← Retour à la liste
           </button>
-          {loadingDetail ? <Spinner /> : bakeryDetail && <BakeryDetail />}
+          {loadingDetail ? <Spinner /> : bakeryDetailJSX}
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "300px 1fr", gap: 28, alignItems: "start" }}>
-          <BakeryList />
+          {bakeryListJSX}
           {!isMobile && (
             <div>
               {!selected
                 ? <EmptyState emoji="🏪" text="Sélectionnez une boulangerie dans la liste" />
                 : loadingDetail ? <Spinner />
-                : bakeryDetail && <BakeryDetail />}
+                : bakeryDetailJSX}
             </div>
           )}
         </div>

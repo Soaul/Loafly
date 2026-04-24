@@ -30,6 +30,11 @@ def list_bakeries():
 
     for b in bakeries:
         b["rating_count"] = rating_counts.get(b["id"], 0)
+        # Normalise les noms de colonnes : latitude/longitude → lat/lng
+        if b.get("lat") is None and b.get("latitude") is not None:
+            b["lat"] = b["latitude"]
+        if b.get("lng") is None and b.get("longitude") is not None:
+            b["lng"] = b["longitude"]
 
     return success(bakeries)
 
@@ -74,6 +79,10 @@ def get_bakery(bakery_id: str):
     bakery = BakeryRepository(db).find_by_id(bakery_id)
     if not bakery:
         return error("Boulangerie introuvable", "NOT_FOUND", 404)
+    if bakery.get("lat") is None and bakery.get("latitude") is not None:
+        bakery["lat"] = bakery["latitude"]
+    if bakery.get("lng") is None and bakery.get("longitude") is not None:
+        bakery["lng"] = bakery["longitude"]
 
     ratings      = RatingRepository(db).find_by_bakery(bakery_id)
     product_types = ProductTypeRepository(db).find_all()
