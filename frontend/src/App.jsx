@@ -124,6 +124,8 @@ const ApiClient = {
   ratings: {
     submit: (payload, userToken) =>
       apiFetch("/ratings/", { method: "POST", body: JSON.stringify(payload) }, null, userToken),
+    mine: (userToken) =>
+      apiFetch("/ratings/mine", {}, null, userToken),
     list: (adminPin) =>
       apiFetch("/ratings/", {}, adminPin),
     remove: (id, adminPin) =>
@@ -762,7 +764,7 @@ function ProductRankingView({ forcedPtId, onShowAuth }) {
   const { productRanking, loadingProduct, fetchProductRanking }   = useRankings();
   const ptId = forcedPtId;
   const [ratingTarget, setRatingTarget] = useState(null);
-  const handleRate = (bakery) => { if (!user) { onShowAuth?.(); return; } setRatingTarget(bakery); };
+  const handleRate = (bakery) => { setRatingTarget(bakery); };
   const medals = ["🥇", "🥈", "🥉"];
 
   useEffect(() => {
@@ -833,7 +835,10 @@ function ProductRankingView({ forcedPtId, onShowAuth }) {
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontSize: 28, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>{overall_average.toFixed(1)}</div>
                   <div style={{ fontSize: 11, color: T.muted, marginBottom: 8 }}>{rating_count} avis</div>
-                  <button onClick={() => handleRate(bakery)} style={css.btnSm}>★ Évaluer</button>
+                  {user
+                  ? <button onClick={() => handleRate(bakery)} style={css.btnSm}>★ Évaluer</button>
+                  : <button onClick={() => onShowAuth?.()} style={{ ...css.btnSm, background: "none", border: `1px solid ${T.border}`, color: T.muted, fontSize: 11 }}>Connexion pour noter</button>
+                }
                 </div>
               </div>
             ))}
@@ -854,7 +859,7 @@ function OverallRankingView({ onShowAuth }) {
   const { overallRanking, loadingOverall, fetchOverallRanking } = useRankings();
   const [ratingTarget, setRatingTarget] = useState(null);
   const medals = ["🥇", "🥈", "🥉"];
-  const handleRate = (bakery) => { if (!user) { onShowAuth?.(); return; } setRatingTarget(bakery); };
+  const handleRate = (bakery) => { setRatingTarget(bakery); };
 
   useEffect(() => { fetchOverallRanking(); }, []);
 
@@ -915,7 +920,10 @@ function OverallRankingView({ onShowAuth }) {
             <div style={{ textAlign: "right", minWidth: 80 }}>
               <div style={{ fontSize: 28, fontWeight: 700, color: T.gold, lineHeight: 1 }}>{overall_average.toFixed(1)}</div>
               <div style={{ fontSize: 11, color: T.muted }}>{total_ratings} avis</div>
-              <button onClick={() => handleRate(bakery)} style={{ ...css.btnSm, marginTop: 8 }}>★ Évaluer</button>
+              {user
+                ? <button onClick={() => handleRate(bakery)} style={{ ...css.btnSm, marginTop: 8 }}>★ Évaluer</button>
+                : <button onClick={() => onShowAuth?.()} style={{ ...css.btnSm, marginTop: 8, background: "none", border: `1px solid ${T.border}`, color: T.muted, fontSize: 11 }}>Connexion pour noter</button>
+              }
             </div>
           </div>
         ))}
@@ -1293,6 +1301,106 @@ function BakeriesView({ onShowAuth }) {
 // ─────────────────────────────────────────────────────────────────────────────
 //  views/ModerationView
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  UserProfileView  —  espace personnel : mes avis
+// ─────────────────────────────────────────────────────────────────────────────
+
+function UserProfileView({ onBack }) {
+  const { user, isMobile }   = useApp();
+  const { logout }           = useUserAuth();
+  const [ratings, setRatings] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    ApiClient.ratings.mine(user.token)
+      .then((data) => setRatings(Array.isArray(data) ? data : []))
+      .catch(() => setRatings([]))
+      .finally(() => setLoading(false));
+  }, [user]);
+
+  const scoreAvg = (scores) => {
+    const vals = Object.values(scores).filter((v) => v > 0);
+    return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : "–";
+  };
+
+  return (
+    <div style={{ maxWidth: 760, margin: "0 auto", padding: isMobile ? "20px 16px 72px" : "32px 24px 72px" }}>
+      <button onClick={onBack} style={{ ...css.btnGhost, marginBottom: 24 }}>← Retour</button>
+
+      {/* ── En-tête profil ── */}
+      <div style={{ background: `linear-gradient(135deg, ${T.dark}, #4A2A18)`, borderRadius: 16, padding: "24px 28px", marginBottom: 28, display: "flex", alignItems: "center", gap: 20 }}>
+        <div style={{ width: 56, height: 56, borderRadius: "50%", background: T.gold, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 700, color: "white", flexShrink: 0 }}>
+          {user?.username?.[0]?.toUpperCase() ?? "?"}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, color: "#FAF3E4", fontWeight: 700 }}>@{user?.username}</div>
+          <div style={{ fontSize: 13, color: `${T.gold}CC`, marginTop: 4 }}>
+            {loading ? "…" : `${ratings.length} avis publié${ratings.length !== 1 ? "s" : ""}`}
+          </div>
+        </div>
+        <button onClick={logout} style={{ background: "none", border: "1px solid #FFFFFF22", color: "#FAF3E460", padding: "8px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+          Déconnexion
+        </button>
+      </div>
+
+      {/* ── Liste des avis ── */}
+      <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.dark, marginBottom: 16 }}>Mes avis</h2>
+
+      {loading ? <Spinner /> : ratings.length === 0 ? (
+        <EmptyState emoji="⭐" text="Vous n'avez pas encore laissé d'avis." />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {ratings.map((r) => (
+            <div key={r.id} style={{ background: "white", borderRadius: 14, border: `1px solid ${T.border}`, overflow: "hidden" }}>
+              {/* En-tête de la carte */}
+              <div style={{ padding: "14px 18px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 16, color: T.dark, fontWeight: 700 }}>
+                    {r.bakeries?.name ?? "—"}
+                  </div>
+                  {r.bakeries?.neighborhood && (
+                    <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{r.bakeries.neighborhood}</div>
+                  )}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ background: `${T.gold}18`, border: `1px solid ${T.gold}44`, color: T.dark, padding: "4px 12px", borderRadius: 20, fontSize: 13 }}>
+                    {r.product_types?.emoji} {r.product_types?.name}
+                  </span>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>
+                    {scoreAvg(r.scores ?? {})}
+                  </span>
+                </div>
+              </div>
+
+              {/* Corps */}
+              <div style={{ padding: "12px 18px" }}>
+                {/* Scores par critère */}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: r.note ? 10 : 0 }}>
+                  {Object.entries(r.scores ?? {}).map(([criterion, val]) => (
+                    <div key={criterion} style={{ display: "flex", alignItems: "center", gap: 6, background: T.bg, padding: "4px 10px", borderRadius: 20, fontSize: 12 }}>
+                      <span style={{ color: T.muted }}>{criterion}</span>
+                      <span style={{ color: T.gold, fontWeight: 600 }}>{val}/5</span>
+                    </div>
+                  ))}
+                </div>
+                {r.note && (
+                  <p style={{ fontSize: 13, color: T.muted, fontStyle: "italic", borderLeft: `3px solid ${T.gold}44`, paddingLeft: 10 }}>
+                    « {r.note} »
+                  </p>
+                )}
+                <div style={{ fontSize: 11, color: T.border, marginTop: 8, textAlign: "right" }}>
+                  {new Date(r.created_at).toLocaleDateString("fr-CA", { year: "numeric", month: "long", day: "numeric" })}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const STATUS_META = {
   pending:   { label: "En attente",  color: "#C8912A", bg: "#FFF8ED" },
@@ -2165,7 +2273,8 @@ function Shell() {
 
   if (loading) return <BaguetteLoader />;
 
-  const isLegalView = view === "cgu" || view === "mentions";
+  const isLegalView   = view === "cgu" || view === "mentions";
+  const isProfileView = view === "profile";
 
   const adminBtnBottom = isMobile ? 78 : 20;
 
@@ -2210,9 +2319,10 @@ function Shell() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             {user ? (
               <>
-                {!isMobile && (
-                  <span style={{ fontSize: 13, color: `${T.gold}CC`, fontStyle: "italic" }}>@{user.username}</span>
-                )}
+                <button onClick={() => setView("profile")}
+                  style={{ background: "none", border: "none", color: `${T.gold}CC`, fontSize: isMobile ? 13 : 13, cursor: "pointer", fontFamily: "inherit", fontStyle: "italic", padding: isMobile ? "6px 8px" : "8px 10px", borderRadius: 8, transition: "color 0.18s" }}>
+                  {isMobile ? "👤" : `@${user.username}`}
+                </button>
                 <button onClick={() => setShowFeedback(true)}
                   title="Envoyer un message / suggestion"
                   style={{ background: "none", border: "1px solid #FFFFFF22", color: "#FAF3E488", padding: isMobile ? "6px 10px" : "8px 14px", borderRadius: 8, fontSize: isMobile ? 16 : 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s", whiteSpace: "nowrap" }}>
@@ -2237,7 +2347,8 @@ function Shell() {
         {view === "home"     && <HomeView onNavigate={setView} onShowAuth={() => setShowAuth(true)} />}
         {view === "cgu"      && <CGUView onBack={() => setView("home")} />}
         {view === "mentions" && <MentionsView onBack={() => setView("home")} />}
-        {!isLegalView && view !== "home" && (
+        {isProfileView       && <UserProfileView onBack={() => setView("home")} />}
+        {!isLegalView && !isProfileView && view !== "home" && (
           <div style={{ padding: isMobile ? "16px" : "32px", maxWidth: 1080, margin: "0 auto" }}>
             {view === "rankings" && <RankingsView onShowAuth={() => setShowAuth(true)} />}
             {view === "bakeries" && <BakeriesView onShowAuth={() => setShowAuth(true)} />}

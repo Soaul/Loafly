@@ -77,6 +77,21 @@ def submit_rating():
     return success(result.data[0], "Avis enregistré, merci !", 201)
 
 
+@ratings_bp.get("/mine")
+@user_required
+def my_ratings():
+    """Avis de l'utilisateur connecté avec détails boulangerie + produit."""
+    db = get_db()
+    result = (
+        db.table("ratings")
+        .select("*, bakeries(id, name, neighborhood), product_types(id, name, emoji)")
+        .eq("user_id", g.user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return success(result.data)
+
+
 @ratings_bp.get("/")
 @admin_required
 def list_ratings():
