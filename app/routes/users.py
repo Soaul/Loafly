@@ -42,7 +42,7 @@ def signup():
 
     user  = result.data[0]
     token = make_token(str(user["id"]))
-    return success({"token": token, "username": user["username"]}, "Compte créé !", 201)
+    return success({"token": token, "username": user["username"], "role": user.get("role", "user")}, "Compte créé !", 201)
 
 
 @users_bp.post("/login")
@@ -62,7 +62,7 @@ def login():
 
     user  = result.data
     token = make_token(str(user["id"]))
-    return success({"token": token, "username": user["username"]})
+    return success({"token": token, "username": user["username"], "role": user.get("role", "user")})
 
 
 @users_bp.get("/me")

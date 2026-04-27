@@ -37,25 +37,26 @@ def get_user_id() -> str | None:
         return None
 
 
-def _check_admin() -> bool:
-    password = request.headers.get("X-Admin-Password", "").strip()
-    if not password:
-        return False
+def _get_user_role(user_id: str) -> str | None:
     result = (
-        get_db().table("app_config")
-        .select("value")
-        .eq("key", "admin_password")
+        get_db().table("users")
+        .select("role")
+        .eq("id", user_id)
         .maybe_single()
         .execute()
     )
-    return bool(result.data and result.data["value"] == password)
+    return result.data.get("role") if result.data else None
 
 
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not _check_admin():
-            return error("Accès admin requis", "ADMIN_REQUIRED", 401)
+        user_id = get_user_id()
+        if not user_id:
+            return error("Authentification requise", "AUTH_REQUIRED", 401)
+        if _get_user_role(user_id) != "admin":
+            return error("Accès admin requis", "ADMIN_REQUIRED", 403)
+        g.user_id = user_id
         return f(*args, **kwargs)
     return decorated
 
@@ -68,21 +69,4 @@ def user_required(f):
             return error("Authentification requise", "AUTH_REQUIRED", 401)
         g.user_id = user_id
         return f(*args, **kwargs)
-    return decorated
-
-
-def user_or_admin_required(f):
-    """Accepte un token utilisateur OU le header X-Admin-Password."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        user_id = get_user_id()
-        if user_id:
-            g.user_id = user_id
-            g.is_admin = False
-            return f(*args, **kwargs)
-        if _check_admin():
-            g.user_id = None
-            g.is_admin = True
-            return f(*args, **kwargs)
-        return error("Authentification requise", "AUTH_REQUIRED", 401)
     return decorated

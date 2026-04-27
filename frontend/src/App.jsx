@@ -38,11 +38,10 @@ class ApiError extends Error {
   }
 }
 
-async function apiFetch(path, options = {}, adminPassword = null, userToken = null) {
+async function apiFetch(path, options = {}, userToken = null) {
   const headers = {
     "Content-Type": "application/json",
-    ...(adminPassword ? { "X-Admin-Password": adminPassword } : {}),
-    ...(userToken    ? { "Authorization": `Bearer ${userToken}` } : {}),
+    ...(userToken ? { "Authorization": `Bearer ${userToken}` } : {}),
     ...options.headers,
   };
 
@@ -56,26 +55,18 @@ async function apiFetch(path, options = {}, adminPassword = null, userToken = nu
 }
 
 const ApiClient = {
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  auth: {
-    verify: (username, password) =>
-      apiFetch("/auth/verify", { method: "POST", body: JSON.stringify({ username, password }) }),
-    changePassword: (newPassword, adminPassword) =>
-      apiFetch("/auth/password", { method: "PUT", body: JSON.stringify({ new_password: newPassword }) }, adminPassword),
-  },
-
   // ── Product types ─────────────────────────────────────────────────────────
   productTypes: {
     list: () =>
       apiFetch("/product-types/"),
-    create: (name, emoji, adminPin) =>
-      apiFetch("/product-types/", { method: "POST", body: JSON.stringify({ name, emoji }) }, adminPin),
-    remove: (id, adminPin) =>
-      apiFetch(`/product-types/${id}`, { method: "DELETE" }, adminPin),
-    addCriterion: (ptId, name, adminPin) =>
-      apiFetch(`/product-types/${ptId}/criteria`, { method: "POST", body: JSON.stringify({ name }) }, adminPin),
-    removeCriterion: (ptId, critId, adminPin) =>
-      apiFetch(`/product-types/${ptId}/criteria/${critId}`, { method: "DELETE" }, adminPin),
+    create: (name, emoji, userToken) =>
+      apiFetch("/product-types/", { method: "POST", body: JSON.stringify({ name, emoji }) }, userToken),
+    remove: (id, userToken) =>
+      apiFetch(`/product-types/${id}`, { method: "DELETE" }, userToken),
+    addCriterion: (ptId, name, userToken) =>
+      apiFetch(`/product-types/${ptId}/criteria`, { method: "POST", body: JSON.stringify({ name }) }, userToken),
+    removeCriterion: (ptId, critId, userToken) =>
+      apiFetch(`/product-types/${ptId}/criteria/${critId}`, { method: "DELETE" }, userToken),
   },
 
   // ── Bakeries ──────────────────────────────────────────────────────────────
@@ -84,12 +75,12 @@ const ApiClient = {
       apiFetch("/bakeries/"),
     get: (id) =>
       apiFetch(`/bakeries/${id}`),
-    create: (payload, adminPin, userToken) =>
-      apiFetch("/bakeries/", { method: "POST", body: JSON.stringify(payload) }, adminPin, userToken),
-    update: (id, payload, adminPin) =>
-      apiFetch(`/bakeries/${id}`, { method: "PUT", body: JSON.stringify(payload) }, adminPin),
-    remove: (id, adminPin) =>
-      apiFetch(`/bakeries/${id}`, { method: "DELETE" }, adminPin),
+    create: (payload, userToken) =>
+      apiFetch("/bakeries/", { method: "POST", body: JSON.stringify(payload) }, userToken),
+    update: (id, payload, userToken) =>
+      apiFetch(`/bakeries/${id}`, { method: "PUT", body: JSON.stringify(payload) }, userToken),
+    remove: (id, userToken) =>
+      apiFetch(`/bakeries/${id}`, { method: "DELETE" }, userToken),
   },
 
   // ── Users ─────────────────────────────────────────────────────────────────
@@ -98,10 +89,10 @@ const ApiClient = {
       apiFetch("/users/signup", { method: "POST", body: JSON.stringify({ username, email, password }) }),
     login: (email, password) =>
       apiFetch("/users/login", { method: "POST", body: JSON.stringify({ email, password }) }),
-    list: (adminPin) =>
-      apiFetch("/users/", {}, adminPin),
-    remove: (id, adminPin) =>
-      apiFetch(`/users/${id}`, { method: "DELETE" }, adminPin),
+    list: (userToken) =>
+      apiFetch("/users/", {}, userToken),
+    remove: (id, userToken) =>
+      apiFetch(`/users/${id}`, { method: "DELETE" }, userToken),
   },
 
   // ── Photos ────────────────────────────────────────────────────────────────
@@ -126,10 +117,12 @@ const ApiClient = {
       apiFetch("/ratings/", { method: "POST", body: JSON.stringify(payload) }, null, userToken),
     mine: (userToken) =>
       apiFetch("/ratings/mine", {}, null, userToken),
-    list: (adminPin) =>
-      apiFetch("/ratings/", {}, adminPin),
-    remove: (id, adminPin) =>
-      apiFetch(`/ratings/${id}`, { method: "DELETE" }, adminPin),
+    update: (id, payload, userToken) =>
+      apiFetch(`/ratings/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, null, userToken),
+    list: (userToken) =>
+      apiFetch("/ratings/", {}, userToken),
+    remove: (id, userToken) =>
+      apiFetch(`/ratings/${id}`, { method: "DELETE" }, userToken),
   },
 
   // ── Rankings ──────────────────────────────────────────────────────────────
@@ -144,10 +137,10 @@ const ApiClient = {
   requests: {
     create: (payload, userToken) =>
       apiFetch("/requests/", { method: "POST", body: JSON.stringify(payload) }, null, userToken),
-    list: (adminPin) =>
-      apiFetch("/requests/", {}, adminPin),
-    updateStatus: (id, status, adminPin) =>
-      apiFetch(`/requests/${id}`, { method: "PUT", body: JSON.stringify({ status }) }, adminPin),
+    list: (userToken) =>
+      apiFetch("/requests/", {}, userToken),
+    updateStatus: (id, status, userToken) =>
+      apiFetch(`/requests/${id}`, { method: "PUT", body: JSON.stringify({ status }) }, userToken),
   },
 };
 
@@ -177,7 +170,6 @@ function AppProvider({ children }) {
   const [productTypes, setProductTypes] = useState([]);
   const [bakeries,     setBakeries]     = useState([]);
   const [loading,      setLoading]      = useState(true);
-  const [adminPin,     setAdminPin]     = useState(null);
   const [user,         setUserState]    = useState(() => {
     try { return JSON.parse(localStorage.getItem("loafly_user")); } catch { return null; }
   });
@@ -220,7 +212,7 @@ function AppProvider({ children }) {
 
   const dismissConfirm = useCallback(() => setConfirm(null), []);
 
-  const isAdmin = adminPin !== null;
+  const isAdmin = user?.role === "admin";
 
   const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
   useEffect(() => {
@@ -232,7 +224,7 @@ function AppProvider({ children }) {
 
   const value = {
     productTypes, bakeries, loading,
-    adminPin, isAdmin, setAdminPin,
+    isAdmin,
     user, setUser, isMobile,
     refresh, notify, requestConfirm,
   };
@@ -259,42 +251,6 @@ const useApp = () => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  hooks/useAdminAuth.js
-// ─────────────────────────────────────────────────────────────────────────────
-
-function useAdminAuth() {
-  const { adminPin, isAdmin, setAdminPin, notify } = useApp();
-
-  const login = useCallback(async (username, password) => {
-    try {
-      const res = await ApiClient.auth.verify(username, password);
-      if (res.valid) { setAdminPin(password); return true; }
-      notify("Identifiants incorrects", "error");
-      return false;
-    } catch (e) {
-      notify(e.message, "error");
-      return false;
-    }
-  }, [setAdminPin, notify]);
-
-  const logout = useCallback(() => setAdminPin(null), [setAdminPin]);
-
-  const changePassword = useCallback(async (newPassword) => {
-    if (!adminPin) { notify("Non connecté", "error"); return false; }
-    try {
-      await ApiClient.auth.changePassword(newPassword, adminPin);
-      notify("Mot de passe modifié !");
-      setAdminPin(newPassword);
-      return true;
-    } catch (e) {
-      notify(e.message, "error");
-      return false;
-    }
-  }, [adminPin, setAdminPin, notify]);
-
-  return { isAdmin, login, logout, changePassword };
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 //  hooks/useUserAuth.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -305,7 +261,7 @@ function useUserAuth() {
   const signup = useCallback(async (username, email, password) => {
     try {
       const res = await ApiClient.users.signup(username, email, password);
-      setUser({ token: res.token, username: res.username });
+      setUser({ token: res.token, username: res.username, role: res.role ?? "user" });
       notify(`Bienvenue, ${res.username} !`);
       return true;
     } catch (e) { notify(e.message, "error"); return false; }
@@ -314,7 +270,7 @@ function useUserAuth() {
   const login = useCallback(async (email, password) => {
     try {
       const res = await ApiClient.users.login(email, password);
-      setUser({ token: res.token, username: res.username });
+      setUser({ token: res.token, username: res.username, role: res.role ?? "user" });
       notify(`Bon retour, ${res.username} !`);
       return true;
     } catch (e) { notify(e.message, "error"); return false; }
@@ -330,7 +286,7 @@ function useUserAuth() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function useProductTypes() {
-  const { productTypes, adminPin, isAdmin, refresh, notify, requestConfirm } = useApp();
+  const { productTypes, isAdmin, user, refresh, notify, requestConfirm } = useApp();
 
   const guard = (fn) => async (...args) => {
     if (!isAdmin) { notify("Action réservée à l'admin", "error"); return null; }
@@ -339,7 +295,7 @@ function useProductTypes() {
 
   const addProductType = guard(async (name, emoji) => {
     try {
-      const pt = await ApiClient.productTypes.create(name, emoji, adminPin);
+      const pt = await ApiClient.productTypes.create(name, emoji, user.token);
       await refresh();
       notify("Produit créé !");
       return pt;
@@ -349,7 +305,7 @@ function useProductTypes() {
   const removeProductType = guard((ptId) => {
     requestConfirm("Supprimer ce produit et tous ses avis ?", async () => {
       try {
-        await ApiClient.productTypes.remove(ptId, adminPin);
+        await ApiClient.productTypes.remove(ptId, user.token);
         await refresh();
         notify("Produit supprimé");
       } catch (e) { notify(e.message, "error"); }
@@ -358,7 +314,7 @@ function useProductTypes() {
 
   const addCriterion = guard(async (ptId, name) => {
     try {
-      await ApiClient.productTypes.addCriterion(ptId, name, adminPin);
+      await ApiClient.productTypes.addCriterion(ptId, name, user.token);
       await refresh();
       notify("Critère ajouté !");
     } catch (e) { notify(e.message, "error"); }
@@ -369,7 +325,7 @@ function useProductTypes() {
       `Supprimer le critère "${critName}" ? Les avis existants ne seront pas affectés.`,
       async () => {
         try {
-          await ApiClient.productTypes.removeCriterion(ptId, critId, adminPin);
+          await ApiClient.productTypes.removeCriterion(ptId, critId, user.token);
           await refresh();
           notify("Critère supprimé");
         } catch (e) { notify(e.message, "error"); }
@@ -385,40 +341,40 @@ function useProductTypes() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function useBakeries() {
-  const { bakeries, adminPin, isAdmin, user, refresh, notify, requestConfirm } = useApp();
+  const { bakeries, isAdmin, user, refresh, notify, requestConfirm } = useApp();
 
   const addBakery = useCallback(async (payload) => {
     if (!isAdmin) { notify("Action réservée à l'admin", "error"); return null; }
     const coords = payload.address ? (await geocodeAddress(payload.address)) ?? {} : {};
     try {
-      const b = await ApiClient.bakeries.create({ ...payload, ...coords }, adminPin);
+      const b = await ApiClient.bakeries.create({ ...payload, ...coords }, user.token);
       await refresh();
       notify("Boulangerie ajoutée !");
       return b;
     } catch (e) { notify(e.message, "error"); return null; }
-  }, [adminPin, isAdmin, refresh, notify]);
+  }, [isAdmin, user, refresh, notify]);
 
   const updateBakery = useCallback(async (bakeryId, payload) => {
     if (!isAdmin) { notify("Action réservée à l'admin", "error"); return null; }
     const coords = payload.address ? (await geocodeAddress(payload.address)) ?? {} : {};
     try {
-      const b = await ApiClient.bakeries.update(bakeryId, { ...payload, ...coords }, adminPin);
+      const b = await ApiClient.bakeries.update(bakeryId, { ...payload, ...coords }, user.token);
       await refresh();
       notify("Boulangerie mise à jour !");
       return b;
     } catch (e) { notify(e.message, "error"); return null; }
-  }, [adminPin, isAdmin, refresh, notify]);
+  }, [isAdmin, user, refresh, notify]);
 
   const removeBakery = useCallback((bakeryId) => {
     if (!isAdmin) { notify("Action réservée à l'admin", "error"); return; }
     requestConfirm("Supprimer cette boulangerie et tous ses avis ?", async () => {
       try {
-        await ApiClient.bakeries.remove(bakeryId, adminPin);
+        await ApiClient.bakeries.remove(bakeryId, user.token);
         await refresh();
         notify("Boulangerie supprimée");
       } catch (e) { notify(e.message, "error"); }
     });
-  }, [adminPin, isAdmin, refresh, notify, requestConfirm]);
+  }, [isAdmin, user, refresh, notify, requestConfirm]);
 
   return { bakeries, addBakery, updateBakery, removeBakery };
 }
@@ -550,17 +506,23 @@ const MONTREAL_NEIGHBORHOODS = [
 function Stars({ value = 0, onChange, size = 22, readOnly = false }) {
   const [hover, setHover] = useState(0);
   const labels = ["", "Très mauvais", "Mauvais", "Correct", "Bon", "Excellent"];
+  const active = hover || value;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <div style={{ display: "flex", gap: 3 }}>
-        {[1,2,3,4,5].map((n) => (
-          <span key={n} onMouseEnter={() => !readOnly && setHover(n)} onMouseLeave={() => !readOnly && setHover(0)}
-            onClick={() => !readOnly && onChange?.(n)} title={labels[n]}
-            style={{ fontSize: size, cursor: readOnly ? "default" : "pointer", color: n <= (hover || value) ? T.gold : T.border, transition: "color 0.1s", lineHeight: 1, userSelect: "none" }}>★</span>
-        ))}
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", gap: 3 }}>
+          {[1,2,3,4,5].map((n) => (
+            <span key={n} onMouseEnter={() => !readOnly && setHover(n)} onMouseLeave={() => !readOnly && setHover(0)}
+              onClick={() => !readOnly && onChange?.(n)} title={labels[n]}
+              style={{ fontSize: size, cursor: readOnly ? "default" : "pointer", color: n <= active ? T.gold : T.border, transition: "color 0.1s", lineHeight: 1, userSelect: "none" }}>★</span>
+          ))}
+        </div>
+        {readOnly && value > 0 && (
+          <span style={{ fontSize: 12, color: T.muted }}>{value.toFixed(1)}</span>
+        )}
       </div>
-      {!readOnly && (hover || value) > 0 && (
-        <span style={{ fontSize: 12, color: T.muted, fontStyle: "italic" }}>{labels[hover || value]}</span>
+      {!readOnly && active > 0 && (
+        <span style={{ fontSize: 13, color: T.gold, fontWeight: 600, letterSpacing: "0.01em", minHeight: 18 }}>{labels[active]}</span>
       )}
     </div>
   );
@@ -568,14 +530,14 @@ function Stars({ value = 0, onChange, size = 22, readOnly = false }) {
 
 function Modal({ title, onClose, children, maxWidth = 480 }) {
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(28,15,7,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" }}
+    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(28,15,7,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 0 }}
       onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: T.bg, borderRadius: 20, width: "100%", maxWidth, boxShadow: "0 24px 64px rgba(44,24,16,0.35)", overflow: "hidden" }}>
-        <div style={{ background: T.dark, padding: "20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, fontWeight: 700, color: "#FAF3E4", lineHeight: 1.2 }}>{title}</h3>
+      <div style={{ background: T.bg, borderRadius: "20px 20px 0 0", width: "100%", maxWidth, maxHeight: "92dvh", display: "flex", flexDirection: "column", boxShadow: "0 -8px 40px rgba(44,24,16,0.35)" }}>
+        <div style={{ background: T.dark, padding: "18px 22px", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "20px 20px 0 0", flexShrink: 0 }}>
+          <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: 19, fontWeight: 700, color: "#FAF3E4", lineHeight: 1.2 }}>{title}</h3>
           <button onClick={onClose} style={{ background: "#ffffff15", border: "none", width: 32, height: 32, borderRadius: 8, color: "#FAF3E490", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, flexShrink: 0 }}>×</button>
         </div>
-        <div style={{ padding: "28px 28px 24px" }}>
+        <div style={{ padding: "22px 22px 32px", overflowY: "auto", flex: 1 }}>
           {children}
         </div>
       </div>
@@ -684,45 +646,21 @@ function Spinner() {
 }
 
 
-function AdminGate({ children }) {
-  const { isAdmin }              = useApp();
-  const { login }                = useAdminAuth();
-  const [username, setUsername]  = useState("loafadmin");
-  const [password, setPassword]  = useState("");
-
-  if (isAdmin) return children;
-
-  return (
-    <div style={{ maxWidth: 360, margin: "80px auto", textAlign: "center" }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
-      <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 22, color: T.dark, marginBottom: 8 }}>Accès administrateur</h2>
-      <p style={{ color: T.muted, fontSize: 14, marginBottom: 28, fontStyle: "italic" }}>Connectez-vous pour accéder à l'espace admin.</p>
-      <Field label="Nom d'utilisateur">
-        <input value={username} onChange={(e) => setUsername(e.target.value)} style={css.input} />
-      </Field>
-      <Field label="Mot de passe">
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") login(username, password).then(ok => { if (ok) setPassword(""); }); }}
-          placeholder="••••••••" style={css.input} />
-      </Field>
-      <button onClick={async () => { const ok = await login(username, password); if (ok) setPassword(""); }}
-        style={{ ...css.btnGold, marginTop: 8 }}>Se connecter</button>
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  views/RankingsView
 // ─────────────────────────────────────────────────────────────────────────────
 
 function AddRatingModal({ bakery, productTypes, defaultPtId, onClose, onSave }) {
-  const [ptId,       setPtId]       = useState(defaultPtId ?? productTypes[0]?.id ?? "");
-  const [scores,     setScores]     = useState({});
-  const [note,       setNote]       = useState("");
-  const [authorName, setAuthorName] = useState("");
-  const [photoFile,  setPhotoFile]  = useState(null);
-  const [preview,    setPreview]    = useState(null);
+  const { user } = useApp();
+  const [ptId,      setPtId]      = useState(defaultPtId ?? productTypes[0]?.id ?? "");
+  const [scores,    setScores]    = useState({});
+  const [note,      setNote]      = useState("");
+  const [photoFile, setPhotoFile] = useState(null);
+  const [preview,   setPreview]   = useState(null);
   const pt = productTypes.find((p) => p.id === ptId);
+
+  const allFilled = pt?.criteria.every((c) => (scores[c.name] ?? 0) > 0);
 
   const handlePhoto = (e) => {
     const f = e.target.files?.[0];
@@ -732,28 +670,53 @@ function AddRatingModal({ bakery, productTypes, defaultPtId, onClose, onSave }) 
   };
 
   return (
-    <Modal title={`Donner mon avis — ${bakery.name}`} onClose={onClose} maxWidth={480}>
-      <Field label="Prénom / pseudo"><input value={authorName} onChange={(e) => setAuthorName(e.target.value)} placeholder="Ex : Marie" style={css.input} /></Field>
-      <Field label="Produit">
-        <select value={ptId} onChange={(e) => { setPtId(e.target.value); setScores({}); }} style={css.input}>
-          {productTypes.map((p) => <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>)}
-        </select>
-      </Field>
+    <Modal title={`Mon avis — ${bakery.name}`} onClose={onClose} maxWidth={520}>
+      {/* Sélecteur produit — pills visuelles */}
+      {productTypes.length > 1 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Produit</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {productTypes.map((p) => (
+              <button key={p.id} onClick={() => { setPtId(p.id); setScores({}); }}
+                style={{ padding: "10px 16px", borderRadius: 24, border: `2px solid ${ptId === p.id ? T.gold : T.border}`, background: ptId === p.id ? `${T.gold}18` : "white", color: T.dark, fontSize: 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", fontWeight: ptId === p.id ? 600 : 400 }}>
+                {p.emoji} {p.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Critères — étoiles grandes pour mobile */}
       {pt?.criteria.map((c) => (
-        <Field key={c.id} label={c.name}>
-          <Stars value={scores[c.name] ?? 0} onChange={(v) => setScores((s) => ({ ...s, [c.name]: v }))} />
-        </Field>
+        <div key={c.id} style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 13, color: T.dark, fontWeight: 600, marginBottom: 8 }}>{c.name}</div>
+          <Stars value={scores[c.name] ?? 0} onChange={(v) => setScores((s) => ({ ...s, [c.name]: v }))} size={36} />
+        </div>
       ))}
-      <Field label="Commentaire (optionnel)">
-        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Un mot sur votre dégustation…" style={{ ...css.input, resize: "vertical", minHeight: 72 }} />
-      </Field>
-      <Field label="Photo (optionnel)">
-        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhoto}
-          style={{ fontSize: 13, color: T.muted }} />
-        {preview && <img src={preview} alt="preview" style={{ marginTop: 8, width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 8 }} />}
-      </Field>
-      <button onClick={() => onSave({ product_type_id: ptId, scores, note, author_name: authorName }, photoFile)}
-        style={{ ...css.btnGold, marginTop: 4 }}>Envoyer mon avis</button>
+
+      {/* Commentaire */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Commentaire <span style={{ fontStyle: "italic", textTransform: "none" }}>(optionnel)</span></div>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Un mot sur votre dégustation…"
+          style={{ ...css.input, resize: "vertical", minHeight: 80 }} />
+      </div>
+
+      {/* Photo */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Photo <span style={{ fontStyle: "italic", textTransform: "none" }}>(optionnel)</span></div>
+        <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", border: `1.5px dashed ${T.border}`, borderRadius: 10, cursor: "pointer", color: T.muted, fontSize: 13 }}>
+          📷 {photoFile ? photoFile.name : "Ajouter une photo"}
+          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhoto} style={{ display: "none" }} />
+        </label>
+        {preview && <img src={preview} alt="preview" style={{ marginTop: 8, width: "100%", maxHeight: 140, objectFit: "cover", borderRadius: 8 }} />}
+      </div>
+
+      <button
+        onClick={() => onSave({ product_type_id: ptId, scores, note, author_name: user?.username ?? "Anonyme" }, photoFile)}
+        disabled={!allFilled}
+        style={{ ...css.btnGold, opacity: allFilled ? 1 : 0.5, cursor: allFilled ? "pointer" : "default" }}>
+        {allFilled ? "Envoyer mon avis ★" : `Notez tous les critères (${Object.values(scores).filter(v => v > 0).length}/${pt?.criteria.length ?? 0})`}
+      </button>
     </Modal>
   );
 }
@@ -937,60 +900,49 @@ function OverallRankingView({ onShowAuth }) {
 }
 
 function RankingsView({ onShowAuth }) {
-  const { productTypes } = useApp();
-  const [sub, setSub] = useState("overall");
+  const { productTypes, isMobile } = useApp();
+  const [sub,  setSub]  = useState("overall");
   const [ptId, setPtId] = useState(null);
-  const [dropOpen, setDropOpen] = useState(false);
-  const dropRef = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => { if (dropRef.current && !dropRef.current.contains(e.target)) setDropOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
   useEffect(() => {
     if (productTypes.length > 0 && !ptId) setPtId(productTypes[0].id);
   }, [productTypes]);
 
-  const selectedPt = productTypes.find((p) => p.id === ptId);
+  const pill = (active) => ({
+    padding: isMobile ? "10px 16px" : "10px 20px",
+    border: `2px solid ${active ? T.gold : T.border}`,
+    background: active ? T.dark : "white",
+    color: active ? "#FAF3E4" : T.muted,
+    borderRadius: 30,
+    fontSize: isMobile ? 14 : 15,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    fontWeight: active ? 600 : 400,
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+    transition: "all 0.15s",
+    boxShadow: active ? `0 2px 10px ${T.gold}33` : "none",
+  });
 
   return (
     <div>
-      {/* ── Nav : bouton Général + dropdown produit ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32, flexWrap: "wrap" }}>
-        <button onClick={() => setSub("overall")}
-          style={{ padding: "11px 22px", border: `2px solid ${sub === "overall" ? T.dark : T.border}`, background: sub === "overall" ? T.dark : "white", color: sub === "overall" ? "#FAF3E4" : T.muted, borderRadius: 10, fontSize: 15, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s", display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
-          🏅 Général
-        </button>
-
-        {/* Dropdown custom */}
-        <div ref={dropRef} style={{ position: "relative", minWidth: 240 }}>
-          <button onClick={() => setDropOpen((o) => !o)}
-            style={{ width: "100%", padding: "11px 16px", border: `2px solid ${sub === "product" ? T.gold : T.border}`, borderRadius: 10, background: "white", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", fontFamily: "inherit", fontSize: 15, color: selectedPt ? T.dark : T.muted, boxShadow: sub === "product" ? `0 2px 8px ${T.gold}22` : "none", transition: "all 0.15s" }}>
-            <span>{selectedPt ? `${selectedPt.emoji}  ${selectedPt.name}` : "🥐 Choisir un produit…"}</span>
-            <span style={{ color: T.muted, fontSize: 12, display: "inline-block", transition: "transform 0.2s", transform: dropOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+      {/* ── Pills scrollables ── */}
+      <div style={{ overflowX: "auto", paddingBottom: 4, marginBottom: 28, WebkitOverflowScrolling: "touch", msOverflowStyle: "none", scrollbarWidth: "none" }}>
+        <div style={{ display: "flex", gap: 8, width: "max-content", padding: "2px 0" }}>
+          <button onClick={() => setSub("overall")} style={pill(sub === "overall")}>
+            🏅 Général
           </button>
-          {dropOpen && (
-            <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "white", borderRadius: 12, border: `2px solid ${T.border}`, boxShadow: "0 8px 32px rgba(44,24,16,0.15)", zIndex: 500, overflow: "hidden" }}>
-              {productTypes.map((p) => (
-                <div key={p.id}
-                  onClick={() => { setPtId(p.id); setSub("product"); setDropOpen(false); }}
-                  style={{ padding: "12px 18px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 15, background: ptId === p.id ? T.bg : "white", color: T.dark, borderBottom: `1px solid #F0E8D5`, transition: "background 0.12s" }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = T.bg}
-                  onMouseLeave={(e) => e.currentTarget.style.background = ptId === p.id ? T.bg : "white"}>
-                  <span style={{ fontSize: 18 }}>{p.emoji}</span>
-                  <span>{p.name}</span>
-                  {ptId === p.id && <span style={{ marginLeft: "auto", color: T.gold, fontSize: 13 }}>✓</span>}
-                </div>
-              ))}
-            </div>
-          )}
+          {productTypes.map((p) => (
+            <button key={p.id}
+              onClick={() => { setPtId(p.id); setSub("product"); }}
+              style={pill(sub === "product" && ptId === p.id)}>
+              {p.emoji} {p.name}
+            </button>
+          ))}
         </div>
       </div>
 
       {sub === "product" && ptId && <ProductRankingView forcedPtId={ptId} onShowAuth={onShowAuth} />}
-      {sub === "product" && !ptId && <EmptyState text="Choisissez un produit dans le menu." />}
       {sub === "overall" && <OverallRankingView onShowAuth={onShowAuth} />}
     </div>
   );
@@ -1112,19 +1064,38 @@ function BakeriesView({ onShowAuth }) {
   const [loadingDetail,  setLoadingDetail]  = useState(false);
   const [showAddBakery,  setShowAddBakery]  = useState(false);
   const [showEditBakery, setShowEditBakery] = useState(false);
-  const [showAddRating,  setShowAddRating]  = useState(false);
-  const [search,         setSearch]         = useState("");
+  const [showAddRating,    setShowAddRating]    = useState(false);
+  const [search,           setSearch]           = useState("");
+  const [productFilter,    setProductFilter]    = useState(null);
+  const [neighborhoodFilter, setNeighborhoodFilter] = useState(null);
+  const [scoreMap,         setScoreMap]         = useState({});
+
+  // Charger les scores globaux pour les afficher sur les cartes
+  useEffect(() => {
+    ApiClient.rankings.overall().then((data) => {
+      if (!Array.isArray(data)) return;
+      const map = {};
+      data.forEach(({ bakery, overall_average }) => { map[bakery.id] = overall_average; });
+      setScoreMap(map);
+    }).catch(() => {});
+  }, []);
 
   const selected = bakeries.find((b) => b.id === selectedId);
   const q = search.trim().toLowerCase();
-  const filtered = q
-    ? bakeries.filter((b) =>
-        b.name.toLowerCase().includes(q) ||
-        b.neighborhood?.toLowerCase().includes(q)
-      )
-    : [...bakeries].sort((a, b) => (b.rating_count ?? 0) - (a.rating_count ?? 0));
+
+  // Quartiers disponibles parmi les boulangeries affichées
+  const neighborhoods = [...new Set(bakeries.map((b) => b.neighborhood).filter(Boolean))].sort();
+
+  const filtered = bakeries
+    .filter((b) => {
+      if (q && !b.name.toLowerCase().includes(q) && !b.neighborhood?.toLowerCase().includes(q)) return false;
+      if (neighborhoodFilter && b.neighborhood !== neighborhoodFilter) return false;
+      return true;
+    })
+    .sort((a, b) => (scoreMap[b.id] ?? 0) - (scoreMap[a.id] ?? 0) || (b.rating_count ?? 0) - (a.rating_count ?? 0));
 
   useEffect(() => {
+    setProductFilter(null);
     if (!selectedId) { setBakeryDetail(null); return; }
     setLoadingDetail(true);
     ApiClient.bakeries.get(selectedId)
@@ -1164,15 +1135,34 @@ function BakeriesView({ onShowAuth }) {
 
   const bakeryListJSX = (
     <div>
-      <div style={{ position: "relative", marginBottom: 12 }}>
+      {/* Barre de recherche */}
+      <div style={{ position: "relative", marginBottom: 10 }}>
         <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 15, pointerEvents: "none" }}>🔍</span>
         <input
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setSelectedId(null); }}
-          placeholder="Rechercher une boulangerie ou un quartier…"
+          onChange={(e) => { setSearch(e.target.value); setSelectedId(null); setNeighborhoodFilter(null); }}
+          placeholder="Rechercher…"
           style={{ ...css.input, paddingLeft: 38 }}
         />
       </div>
+
+      {/* Filtre quartier — pills scrollables */}
+      {neighborhoods.length > 0 && (
+        <div style={{ overflowX: "auto", paddingBottom: 8, marginBottom: 12, WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
+          <div style={{ display: "flex", gap: 6, width: "max-content" }}>
+            <button onClick={() => setNeighborhoodFilter(null)}
+              style={{ padding: "6px 14px", borderRadius: 20, border: `1.5px solid ${neighborhoodFilter === null ? T.dark : T.border}`, background: neighborhoodFilter === null ? T.dark : "white", color: neighborhoodFilter === null ? "#FAF3E4" : T.muted, fontSize: 12, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+              Tous
+            </button>
+            {neighborhoods.map((n) => (
+              <button key={n} onClick={() => { setNeighborhoodFilter(n); setSearch(""); setSelectedId(null); }}
+                style={{ padding: "6px 14px", borderRadius: 20, border: `1.5px solid ${neighborhoodFilter === n ? T.gold : T.border}`, background: neighborhoodFilter === n ? `${T.gold}18` : "white", color: neighborhoodFilter === n ? T.dark : T.muted, fontSize: 12, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", fontWeight: neighborhoodFilter === n ? 600 : 400 }}>
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {isAdmin && (
         <button onClick={() => setShowAddBakery(true)} style={{ ...css.btnDark, width: "100%", marginBottom: 12 }}>
@@ -1180,17 +1170,30 @@ function BakeriesView({ onShowAuth }) {
         </button>
       )}
 
-      <div style={{ maxHeight: isMobile ? "none" : "calc(100vh - 260px)", overflowY: "auto", paddingRight: 2 }}>
+      <div style={{ maxHeight: isMobile ? "none" : "calc(100vh - 320px)", overflowY: "auto", paddingRight: 2 }}>
         {filtered.length === 0 ? (
           <p style={{ color: T.muted, fontStyle: "italic", fontSize: 14, padding: "12px 0" }}>Aucune boulangerie trouvée.</p>
-        ) : filtered.map((b) => (
+        ) : filtered.map((b) => {
+          const score = scoreMap[b.id];
+          const isSelected = selectedId === b.id;
+          return (
           <div key={b.id} onClick={() => setSelectedId(b.id)}
-            style={{ padding: "12px 16px", marginBottom: 8, borderRadius: 10, cursor: "pointer", background: selectedId === b.id ? T.dark : "white", color: selectedId === b.id ? "#FAF3E4" : T.dark, border: `2px solid ${selectedId === b.id ? T.gold : T.border}`, transition: "all 0.15s" }}>
-            <div style={{ fontFamily: '"Playfair Display", serif', fontWeight: 600, fontSize: 15 }}>{b.name}</div>
-            {b.neighborhood && <div style={{ fontSize: 12, opacity: 0.65, marginTop: 2 }}>{b.neighborhood}</div>}
-            <div style={{ fontSize: 12, opacity: 0.5, marginTop: 3 }}>{b.rating_count ?? 0} avis</div>
+            style={{ padding: "13px 16px", marginBottom: 8, borderRadius: 12, cursor: "pointer", background: isSelected ? T.dark : "white", color: isSelected ? "#FAF3E4" : T.dark, border: `2px solid ${isSelected ? T.gold : T.border}`, transition: "all 0.15s", display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: '"Playfair Display", serif', fontWeight: 600, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{b.name}</div>
+              {b.neighborhood && <div style={{ fontSize: 12, opacity: 0.65, marginTop: 2 }}>{b.neighborhood}</div>}
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              {score != null ? (
+                <div style={{ fontSize: 17, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>{score.toFixed(1)} ★</div>
+              ) : (
+                <div style={{ fontSize: 12, opacity: 0.4 }}>—</div>
+              )}
+              <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>{b.rating_count ?? 0} avis</div>
+            </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1229,7 +1232,22 @@ function BakeriesView({ onShowAuth }) {
         <EmptyState text="Aucun avis pour cette boulangerie." />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {bakeryDetail.products.map(({ product_type, aggregated_scores, overall_average, rating_count, individual_ratings }) => (
+          {/* ── Filtre par produit ── */}
+          {bakeryDetail.products.length > 1 && (
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, WebkitOverflowScrolling: "touch" }}>
+              <button onClick={() => setProductFilter(null)}
+                style={{ padding: "8px 16px", borderRadius: 20, border: `1.5px solid ${productFilter === null ? T.dark : T.border}`, background: productFilter === null ? T.dark : "white", color: productFilter === null ? "#FAF3E4" : T.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 }}>
+                Tous
+              </button>
+              {bakeryDetail.products.map(({ product_type }) => (
+                <button key={product_type.id} onClick={() => setProductFilter(product_type.id)}
+                  style={{ padding: "8px 16px", borderRadius: 20, border: `1.5px solid ${productFilter === product_type.id ? T.gold : T.border}`, background: productFilter === product_type.id ? `${T.gold}18` : "white", color: productFilter === product_type.id ? T.dark : T.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0, fontWeight: productFilter === product_type.id ? 600 : 400 }}>
+                  {product_type.emoji} {product_type.name}
+                </button>
+              ))}
+            </div>
+          )}
+          {bakeryDetail.products.filter(p => productFilter === null || p.product_type.id === productFilter).map(({ product_type, aggregated_scores, overall_average, rating_count, individual_ratings }) => (
             <div key={product_type.id} style={{ background: "white", borderRadius: 14, padding: 22, border: `1px solid ${T.border}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                 <span style={{ fontFamily: '"Playfair Display", serif', fontSize: 17 }}>{product_type.emoji} {product_type.name}</span>
@@ -1303,14 +1321,77 @@ function BakeriesView({ onShowAuth }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  EditRatingModal  —  modifier un avis existant
+// ─────────────────────────────────────────────────────────────────────────────
+
+function EditRatingModal({ rating, onClose, onSaved }) {
+  const { user, notify } = useApp();
+  const [scores, setScores] = useState({ ...rating.scores });
+  const [note,   setNote]   = useState(rating.note ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const criteria = Object.keys(rating.scores);
+  const allFilled = criteria.every((c) => (scores[c] ?? 0) > 0);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const updated = await ApiClient.ratings.update(rating.id, { scores, note }, user.token);
+      notify("Avis modifié !");
+      onSaved(updated);
+      onClose();
+    } catch (e) {
+      notify(e.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const ptName = rating.product_types?.name ?? "";
+
+  return (
+    <Modal title={`Modifier — ${rating.bakeries?.name ?? ""}`} onClose={onClose} maxWidth={480}>
+      {ptName && (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${T.gold}18`, border: `1px solid ${T.gold}44`, padding: "6px 14px", borderRadius: 20, fontSize: 13, marginBottom: 20 }}>
+          {rating.product_types?.emoji} {ptName}
+        </div>
+      )}
+
+      {criteria.map((c) => (
+        <div key={c} style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 13, color: T.dark, fontWeight: 600, marginBottom: 8 }}>{c}</div>
+          <Stars value={scores[c] ?? 0} onChange={(v) => setScores((s) => ({ ...s, [c]: v }))} size={34} />
+        </div>
+      ))}
+
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
+          Commentaire <span style={{ fontStyle: "italic", textTransform: "none" }}>(optionnel)</span>
+        </div>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)}
+          placeholder="Un mot sur votre dégustation…"
+          style={{ ...css.input, resize: "vertical", minHeight: 80 }} />
+      </div>
+
+      <button onClick={handleSave} disabled={saving || !allFilled}
+        style={{ ...css.btnGold, opacity: (saving || !allFilled) ? 0.6 : 1 }}>
+        {saving ? "Enregistrement…" : "Enregistrer les modifications"}
+      </button>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  UserProfileView  —  espace personnel : mes avis
 // ─────────────────────────────────────────────────────────────────────────────
 
 function UserProfileView({ onBack, onShowFeedback }) {
-  const { user, isMobile }   = useApp();
-  const { logout }           = useUserAuth();
+  const { user, isAdmin, isMobile } = useApp();
+  const { logout }                  = useUserAuth();
+  const [tab,     setTab]     = useState("avis");
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(null);
 
   useEffect(() => {
     if (!user) return;
@@ -1325,93 +1406,129 @@ function UserProfileView({ onBack, onShowFeedback }) {
     return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : "–";
   };
 
+  const handleSaved = (updated) => {
+    setRatings((prev) => prev.map((r) => r.id === updated.id ? { ...r, scores: updated.scores, note: updated.note } : r));
+  };
+
+  const TABS = [
+    { id: "avis",       label: "⭐ Mes avis" },
+    ...(isAdmin ? [
+      { id: "produits",    label: "📦 Produits" },
+      { id: "moderation",  label: "🛡️ Modération" },
+    ] : []),
+  ];
+
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", padding: isMobile ? "20px 16px 72px" : "32px 24px 72px" }}>
+    <div style={{ maxWidth: 860, margin: "0 auto", padding: isMobile ? "20px 16px 72px" : "32px 24px 72px" }}>
       <button onClick={onBack} style={{ ...css.btnGhost, marginBottom: 24 }}>← Retour</button>
 
       {/* ── En-tête profil ── */}
-      <div style={{ background: `linear-gradient(135deg, ${T.dark}, #4A2A18)`, borderRadius: 16, padding: "24px 28px", marginBottom: 28, display: "flex", alignItems: "center", gap: 20 }}>
+      <div style={{ background: `linear-gradient(135deg, ${T.dark}, #4A2A18)`, borderRadius: 16, padding: "24px 28px", marginBottom: 24, display: "flex", alignItems: "center", gap: 20 }}>
         <div style={{ width: 56, height: 56, borderRadius: "50%", background: T.gold, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 700, color: "white", flexShrink: 0 }}>
           {user?.username?.[0]?.toUpperCase() ?? "?"}
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, color: "#FAF3E4", fontWeight: 700 }}>@{user?.username}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, color: "#FAF3E4", fontWeight: 700 }}>@{user?.username}</div>
+            {isAdmin && (
+              <span style={{ background: T.gold, color: "white", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, letterSpacing: "0.05em" }}>ADMIN</span>
+            )}
+          </div>
           <div style={{ fontSize: 13, color: `${T.gold}CC`, marginTop: 4 }}>
             {loading ? "…" : `${ratings.length} avis publié${ratings.length !== 1 ? "s" : ""}`}
           </div>
         </div>
-        <button onClick={logout} style={{ background: "none", border: "1px solid #FFFFFF22", color: "#FAF3E460", padding: "8px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+        <button onClick={logout} style={{ background: "none", border: "1px solid #FFFFFF22", color: "#FAF3E460", padding: "8px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
           Déconnexion
         </button>
       </div>
 
-      {/* ── Actions ── */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 28, flexWrap: "wrap" }}>
-        <button onClick={onShowFeedback}
-          style={{ display: "flex", alignItems: "center", gap: 10, background: "white", border: `1.5px solid ${T.border}`, color: T.dark, padding: "14px 22px", borderRadius: 12, cursor: "pointer", fontFamily: "inherit", fontSize: 14, flex: 1, minWidth: 200, transition: "border-color 0.18s, box-shadow 0.18s" }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = T.gold; e.currentTarget.style.boxShadow = `0 2px 12px ${T.gold}22`; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.boxShadow = "none"; }}>
-          <span style={{ fontSize: 22 }}>💬</span>
-          <div style={{ textAlign: "left" }}>
-            <div style={{ fontWeight: 600 }}>Envoyer un message</div>
-            <div style={{ fontSize: 12, color: T.muted, marginTop: 1 }}>Suggestion, bug, ou autre…</div>
-          </div>
-        </button>
+      {/* ── Onglets ── */}
+      <div style={{ display: "flex", gap: 4, background: "white", border: `1px solid ${T.border}`, borderRadius: 10, padding: 4, marginBottom: 24, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        {TABS.map(({ id, label }) => (
+          <button key={id} onClick={() => setTab(id)}
+            style={{ padding: "8px 18px", border: "none", borderRadius: 7, background: tab === id ? T.dark : "transparent", color: tab === id ? "#FAF3E4" : T.muted, fontSize: isMobile ? 13 : 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s", whiteSpace: "nowrap", flexShrink: 0 }}>
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* ── Liste des avis ── */}
-      <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.dark, marginBottom: 16 }}>Mes avis</h2>
+      {/* ── Contenu par onglet ── */}
 
-      {loading ? <Spinner /> : ratings.length === 0 ? (
-        <EmptyState emoji="⭐" text="Vous n'avez pas encore laissé d'avis." />
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {ratings.map((r) => (
-            <div key={r.id} style={{ background: "white", borderRadius: 14, border: `1px solid ${T.border}`, overflow: "hidden" }}>
-              {/* En-tête de la carte */}
-              <div style={{ padding: "14px 18px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 16, color: T.dark, fontWeight: 700 }}>
-                    {r.bakeries?.name ?? "—"}
-                  </div>
-                  {r.bakeries?.neighborhood && (
-                    <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{r.bakeries.neighborhood}</div>
-                  )}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ background: `${T.gold}18`, border: `1px solid ${T.gold}44`, color: T.dark, padding: "4px 12px", borderRadius: 20, fontSize: 13 }}>
-                    {r.product_types?.emoji} {r.product_types?.name}
-                  </span>
-                  <span style={{ fontSize: 22, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>
-                    {scoreAvg(r.scores ?? {})}
-                  </span>
-                </div>
+      {tab === "avis" && (
+        <>
+          {/* Bouton feedback */}
+          <div style={{ marginBottom: 24 }}>
+            <button onClick={onShowFeedback}
+              style={{ display: "flex", alignItems: "center", gap: 10, background: "white", border: `1.5px solid ${T.border}`, color: T.dark, padding: "14px 22px", borderRadius: 12, cursor: "pointer", fontFamily: "inherit", fontSize: 14, width: "100%", maxWidth: 360, transition: "border-color 0.18s, box-shadow 0.18s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = T.gold; e.currentTarget.style.boxShadow = `0 2px 12px ${T.gold}22`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.boxShadow = "none"; }}>
+              <span style={{ fontSize: 22 }}>💬</span>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontWeight: 600 }}>Envoyer un message</div>
+                <div style={{ fontSize: 12, color: T.muted, marginTop: 1 }}>Suggestion, bug, ou autre…</div>
               </div>
+            </button>
+          </div>
 
-              {/* Corps */}
-              <div style={{ padding: "12px 18px" }}>
-                {/* Scores par critère */}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: r.note ? 10 : 0 }}>
-                  {Object.entries(r.scores ?? {}).map(([criterion, val]) => (
-                    <div key={criterion} style={{ display: "flex", alignItems: "center", gap: 6, background: T.bg, padding: "4px 10px", borderRadius: 20, fontSize: 12 }}>
-                      <span style={{ color: T.muted }}>{criterion}</span>
-                      <span style={{ color: T.gold, fontWeight: 600 }}>{val}/5</span>
+          {/* Liste des avis */}
+          <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.dark, marginBottom: 16 }}>Mes avis</h2>
+
+          {loading ? <Spinner /> : ratings.length === 0 ? (
+            <EmptyState emoji="⭐" text="Vous n'avez pas encore laissé d'avis." />
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {ratings.map((r) => (
+                <div key={r.id} style={{ background: "white", borderRadius: 14, border: `1px solid ${T.border}`, overflow: "hidden" }}>
+                  <div style={{ padding: "14px 18px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 16, color: T.dark, fontWeight: 700 }}>{r.bakeries?.name ?? "—"}</div>
+                      {r.bakeries?.neighborhood && <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{r.bakeries.neighborhood}</div>}
                     </div>
-                  ))}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ background: `${T.gold}18`, border: `1px solid ${T.gold}44`, color: T.dark, padding: "4px 12px", borderRadius: 20, fontSize: 13 }}>
+                        {r.product_types?.emoji} {r.product_types?.name}
+                      </span>
+                      <span style={{ fontSize: 22, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>
+                        {scoreAvg(r.scores ?? {})}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ padding: "12px 18px" }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: r.note ? 10 : 0 }}>
+                      {Object.entries(r.scores ?? {}).map(([criterion, val]) => (
+                        <div key={criterion} style={{ display: "flex", alignItems: "center", gap: 6, background: T.bg, padding: "4px 10px", borderRadius: 20, fontSize: 12 }}>
+                          <span style={{ color: T.muted }}>{criterion}</span>
+                          <span style={{ color: T.gold, fontWeight: 600 }}>{val}/5</span>
+                        </div>
+                      ))}
+                    </div>
+                    {r.note && (
+                      <p style={{ fontSize: 13, color: T.muted, fontStyle: "italic", borderLeft: `3px solid ${T.gold}44`, paddingLeft: 10, marginBottom: 8 }}>« {r.note} »</p>
+                    )}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                      <div style={{ fontSize: 11, color: T.border }}>
+                        {new Date(r.created_at).toLocaleDateString("fr-CA", { year: "numeric", month: "long", day: "numeric" })}
+                      </div>
+                      <button onClick={() => setEditing(r)}
+                        style={{ background: "none", border: `1px solid ${T.border}`, color: T.muted, padding: "5px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                        ✏️ Modifier
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                {r.note && (
-                  <p style={{ fontSize: 13, color: T.muted, fontStyle: "italic", borderLeft: `3px solid ${T.gold}44`, paddingLeft: 10 }}>
-                    « {r.note} »
-                  </p>
-                )}
-                <div style={{ fontSize: 11, color: T.border, marginTop: 8, textAlign: "right" }}>
-                  {new Date(r.created_at).toLocaleDateString("fr-CA", { year: "numeric", month: "long", day: "numeric" })}
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+
+          {editing && (
+            <EditRatingModal rating={editing} onClose={() => setEditing(null)} onSaved={handleSaved} />
+          )}
+        </>
       )}
+
+      {tab === "produits"   && isAdmin && <AdminProductsView />}
+      {tab === "moderation" && isAdmin && <ModerationView />}
     </div>
   );
 }
@@ -1423,7 +1540,7 @@ const STATUS_META = {
 };
 
 function ModerationView() {
-  const { adminPin, requestConfirm, notify } = useApp();
+  const { user, requestConfirm, notify } = useApp();
   const [sub,      setSub]      = useState("ratings");
   const [ratings,  setRatings]  = useState([]);
   const [users,    setUsers]    = useState([]);
@@ -1434,24 +1551,24 @@ function ModerationView() {
 
   const loadRatings = useCallback(async () => {
     setLoading(true);
-    try { setRatings(await ApiClient.ratings.list(adminPin)); }
+    try { setRatings(await ApiClient.ratings.list(user.token)); }
     catch (e) { notify(e.message, "error"); }
     finally { setLoading(false); }
-  }, [adminPin, notify]);
+  }, [user, notify]);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
-    try { setUsers(await ApiClient.users.list(adminPin)); }
+    try { setUsers(await ApiClient.users.list(user.token)); }
     catch (e) { notify(e.message, "error"); }
     finally { setLoading(false); }
-  }, [adminPin, notify]);
+  }, [user, notify]);
 
   const loadRequests = useCallback(async () => {
     setLoading(true);
-    try { setReqs(await ApiClient.requests.list(adminPin)); }
+    try { setReqs(await ApiClient.requests.list(user.token)); }
     catch (e) { notify(e.message, "error"); }
     finally { setLoading(false); }
-  }, [adminPin, notify]);
+  }, [user, notify]);
 
   useEffect(() => {
     if (sub === "ratings") loadRatings();
@@ -1461,7 +1578,7 @@ function ModerationView() {
 
   const deleteRating = (id) => requestConfirm("Supprimer cet avis ?", async () => {
     try {
-      await ApiClient.ratings.remove(id, adminPin);
+      await ApiClient.ratings.remove(id, user.token);
       setRatings((r) => r.filter((x) => x.id !== id));
       notify("Avis supprimé");
     } catch (e) { notify(e.message, "error"); }
@@ -1469,7 +1586,7 @@ function ModerationView() {
 
   const deleteUser = (id, username) => requestConfirm(`Supprimer l'utilisateur « ${username} » ?`, async () => {
     try {
-      await ApiClient.users.remove(id, adminPin);
+      await ApiClient.users.remove(id, user.token);
       setUsers((u) => u.filter((x) => x.id !== id));
       notify("Utilisateur supprimé");
     } catch (e) { notify(e.message, "error"); }
@@ -1477,7 +1594,7 @@ function ModerationView() {
 
   const updateReqStatus = async (id, status) => {
     try {
-      const updated = await ApiClient.requests.updateStatus(id, status, adminPin);
+      await ApiClient.requests.updateStatus(id, status, user.token);
       setReqs((r) => r.map((x) => x.id === id ? { ...x, status } : x));
       notify(STATUS_META[status].label + " ✓");
     } catch (e) { notify(e.message, "error"); }
@@ -1619,17 +1736,14 @@ function ModerationView() {
 //  views/AdminView
 // ─────────────────────────────────────────────────────────────────────────────
 
-function AdminView() {
-  const { productTypes, isMobile }                                                        = useApp();
-  const { addProductType, removeProductType, addCriterion, removeCriterion }              = useProductTypes();
-  const { logout, changePassword }                                                        = useAdminAuth();
+function AdminProductsView() {
+  const { productTypes, isMobile } = useApp();
+  const { addProductType, removeProductType, addCriterion, removeCriterion } = useProductTypes();
 
   const [selectedPtId, setSelectedPtId] = useState(() => productTypes[0]?.id ?? null);
-  const [tab,          setTab]          = useState("products");
   const [showAddPt,    setShowAddPt]    = useState(false);
   const [newPt,        setNewPt]        = useState({ name: "", emoji: "🍞" });
   const [newCrit,      setNewCrit]      = useState("");
-  const [pinForm,      setPinForm]      = useState({ next: "", confirm: "" });
 
   useEffect(() => {
     if (!selectedPtId && productTypes.length > 0) setSelectedPtId(productTypes[0].id);
@@ -1643,87 +1757,54 @@ function AdminView() {
   const selectedPt = productTypes.find((p) => p.id === selectedPtId);
 
   return (
-    <AdminGate>
-      <div>
-        <div style={{ display: "flex", gap: 4, background: "white", border: `1px solid ${T.border}`, borderRadius: 10, padding: 4, marginBottom: 28, width: "fit-content" }}>
-          {[["products", "📦 Produits & critères"], ["moderation", "🛡️ Modération"], ["security", "🔑 Sécurité"]].map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} style={{ padding: "8px 20px", border: "none", borderRadius: 7, background: tab === id ? T.dark : "transparent", color: tab === id ? "#FAF3E4" : T.muted, fontSize: 14, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>{label}</button>
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 20 : 22, color: T.dark }}>Produits & critères</h2>
+        <button onClick={() => setShowAddPt(true)} style={css.btnDark}>+ Nouveau produit</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "260px 1fr", gap: 20, alignItems: "start" }}>
+        <div>
+          {productTypes.map((pt) => (
+            <div key={pt.id} onClick={() => setSelectedPtId(pt.id)}
+              style={{ padding: "12px 16px", marginBottom: 8, borderRadius: 10, cursor: "pointer", background: selectedPtId === pt.id ? T.dark : "white", color: selectedPtId === pt.id ? "#FAF3E4" : T.dark, border: `2px solid ${selectedPtId === pt.id ? T.gold : T.border}`, transition: "all 0.2s", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>{pt.emoji} {pt.name}</span>
+              <span style={{ fontSize: 12, opacity: 0.6 }}>{pt.criteria.length} critères</span>
+            </div>
           ))}
         </div>
-
-        {tab === "moderation" && <ModerationView />}
-
-        {tab === "security" && (
-          <div style={{ background: "white", borderRadius: 14, padding: 26, border: `1px solid ${T.border}`, maxWidth: 380 }}>
-            <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.dark, marginBottom: 20 }}>🔑 Changer le mot de passe</div>
-            <Field label="Nouveau mot de passe">
-              <input type="password" value={pinForm.next} onChange={(e) => setPinForm((p) => ({ ...p, next: e.target.value }))} placeholder="••••••••" style={css.input} />
-            </Field>
-            <Field label="Confirmer">
-              <input type="password" value={pinForm.confirm} onChange={(e) => setPinForm((p) => ({ ...p, confirm: e.target.value }))} placeholder="••••••••" style={css.input} />
-            </Field>
-            {pinForm.next && pinForm.confirm && pinForm.next !== pinForm.confirm && (
-              <p style={{ color: T.danger, fontSize: 13, marginBottom: 12 }}>Les mots de passe ne correspondent pas.</p>
-            )}
+        {selectedPt ? (
+          <div style={{ background: "white", borderRadius: 14, padding: 26, border: `1px solid ${T.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, color: T.dark }}>{selectedPt.emoji} {selectedPt.name}</div>
+              <button onClick={() => removeProductType(selectedPt.id)} style={css.btnGhost}>Supprimer</button>
+            </div>
+            <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Critères</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+              {selectedPt.criteria.map((c) => (
+                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, background: T.bg, padding: "7px 14px", borderRadius: 30, border: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 14, color: T.dark }}>{c.name}</span>
+                  <button onClick={() => removeCriterion(selectedPt.id, c.id, c.name)} style={{ background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
+                </div>
+              ))}
+            </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={async () => { if (pinForm.next === pinForm.confirm) { const ok = await changePassword(pinForm.next); if (ok) setPinForm({ next: "", confirm: "" }); } }} style={{ ...css.btnGold, flex: 1, width: "auto" }}>Modifier</button>
-              <button onClick={logout} style={{ ...css.btnGhost, color: T.muted }}>Déconnexion</button>
+              <input value={newCrit} onChange={(e) => setNewCrit(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { addCriterion(selectedPt.id, newCrit); setNewCrit(""); } }} placeholder="Nouveau critère…" style={{ ...css.input, flex: 1 }} />
+              <button onClick={() => { addCriterion(selectedPt.id, newCrit); setNewCrit(""); }} style={css.btnDark}>Ajouter</button>
             </div>
           </div>
-        )}
-
-        {tab === "products" && (
-          <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 22, color: T.dark }}>Produits & critères</h2>
-              <button onClick={() => setShowAddPt(true)} style={css.btnDark}>+ Nouveau produit</button>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "260px 1fr", gap: 20, alignItems: "start" }}>
-              <div>
-                {productTypes.map((pt) => (
-                  <div key={pt.id} onClick={() => setSelectedPtId(pt.id)}
-                    style={{ padding: "12px 16px", marginBottom: 8, borderRadius: 10, cursor: "pointer", background: selectedPtId === pt.id ? T.dark : "white", color: selectedPtId === pt.id ? "#FAF3E4" : T.dark, border: `2px solid ${selectedPtId === pt.id ? T.gold : T.border}`, transition: "all 0.2s", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span>{pt.emoji} {pt.name}</span>
-                    <span style={{ fontSize: 12, opacity: 0.6 }}>{pt.criteria.length} critères</span>
-                  </div>
-                ))}
-              </div>
-              {selectedPt ? (
-                <div style={{ background: "white", borderRadius: 14, padding: 26, border: `1px solid ${T.border}` }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-                    <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, color: T.dark }}>{selectedPt.emoji} {selectedPt.name}</div>
-                    <button onClick={() => removeProductType(selectedPt.id)} style={css.btnGhost}>Supprimer</button>
-                  </div>
-                  <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Critères</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
-                    {selectedPt.criteria.map((c) => (
-                      <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, background: T.bg, padding: "7px 14px", borderRadius: 30, border: `1px solid ${T.border}` }}>
-                        <span style={{ fontSize: 14, color: T.dark }}>{c.name}</span>
-                        <button onClick={() => removeCriterion(selectedPt.id, c.id, c.name)} style={{ background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <input value={newCrit} onChange={(e) => setNewCrit(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { addCriterion(selectedPt.id, newCrit); setNewCrit(""); } }} placeholder="Nouveau critère…" style={{ ...css.input, flex: 1 }} />
-                    <button onClick={() => { addCriterion(selectedPt.id, newCrit); setNewCrit(""); }} style={css.btnDark}>Ajouter</button>
-                  </div>
-                </div>
-              ) : <EmptyState text="Sélectionnez un produit" />}
-            </div>
-          </>
-        )}
-
-        {showAddPt && (
-          <Modal title="Nouveau produit" onClose={() => setShowAddPt(false)}>
-            <div style={{ display: "flex", gap: 12 }}>
-              <Field label="Emoji" style={{ width: 90 }}><input value={newPt.emoji} onChange={(e) => setNewPt((p) => ({ ...p, emoji: e.target.value }))} style={{ ...css.input, textAlign: "center", fontSize: 22 }} /></Field>
-              <Field label="Nom *" style={{ flex: 1 }}><input value={newPt.name} onChange={(e) => setNewPt((p) => ({ ...p, name: e.target.value }))} placeholder="Ex : Pain de campagne" style={css.input} /></Field>
-            </div>
-            <button onClick={handleAddPt} style={css.btnGold}>Créer</button>
-          </Modal>
-        )}
+        ) : <EmptyState text="Sélectionnez un produit" />}
       </div>
-    </AdminGate>
+
+      {showAddPt && (
+        <Modal title="Nouveau produit" onClose={() => setShowAddPt(false)}>
+          <div style={{ display: "flex", gap: 12 }}>
+            <Field label="Emoji" style={{ width: 90 }}><input value={newPt.emoji} onChange={(e) => setNewPt((p) => ({ ...p, emoji: e.target.value }))} style={{ ...css.input, textAlign: "center", fontSize: 22 }} /></Field>
+            <Field label="Nom *" style={{ flex: 1 }}><input value={newPt.name} onChange={(e) => setNewPt((p) => ({ ...p, name: e.target.value }))} placeholder="Ex : Pain de campagne" style={css.input} /></Field>
+          </div>
+          <button onClick={handleAddPt} style={css.btnGold}>Créer</button>
+        </Modal>
+      )}
+    </>
   );
 }
 
@@ -1918,29 +1999,44 @@ function HomeView({ onNavigate, onShowAuth }) {
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "20px 16px 48px" : "32px 32px 72px" }}>
 
       {/* ── Hero card ── */}
-      <div style={{ background: `linear-gradient(135deg, ${T.dark} 0%, #4A2A18 100%)`, borderRadius: 20, overflow: "hidden", position: "relative", marginBottom: isMobile ? 32 : 48, padding: isMobile ? "32px 24px" : "48px 48px" }}>
+      <div style={{ background: `linear-gradient(135deg, ${T.dark} 0%, #4A2A18 100%)`, borderRadius: isMobile ? 16 : 20, overflow: "hidden", position: "relative", marginBottom: isMobile ? 24 : 48, padding: isMobile ? "24px 20px" : "48px 48px" }}>
         <div style={{ position: "absolute", right: -60, top: -60, width: 320, height: 320, borderRadius: "50%", border: `1px solid ${T.gold}18`, pointerEvents: "none" }} />
         <div style={{ position: "absolute", right: 20, top: 20, width: 200, height: 200, borderRadius: "50%", border: `1px solid ${T.gold}10`, pointerEvents: "none" }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 32, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
           {/* Colonne texte */}
           <div style={{ flex: "1 1 260px" }}>
-            <div style={{ fontSize: 11, color: T.gold, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 14 }}>
+            <div style={{ fontSize: 10, color: T.gold, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: isMobile ? 10 : 14 }}>
               Montréal · Guide artisanal
             </div>
-            <h1 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? "clamp(28px, 8vw, 36px)" : "clamp(28px, 3.2vw, 42px)", fontWeight: 900, color: "#FAF3E4", lineHeight: 1.18, marginBottom: 16 }}>
-              Les meilleures<br />boulangeries<br /><span style={{ color: T.gold }}>de Montréal</span>
+            <h1 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? "clamp(24px, 7vw, 30px)" : "clamp(28px, 3.2vw, 42px)", fontWeight: 900, color: "#FAF3E4", lineHeight: 1.18, marginBottom: isMobile ? 12 : 16 }}>
+              {isMobile ? (
+                <>Les meilleures <span style={{ color: T.gold }}>boulangeries</span> de Montréal</>
+              ) : (
+                <>Les meilleures<br />boulangeries<br /><span style={{ color: T.gold }}>de Montréal</span></>
+              )}
             </h1>
-            <p style={{ fontSize: isMobile ? 13 : 14, color: "#FAF3E4AA", lineHeight: 1.65, marginBottom: 28, maxWidth: 360 }}>
-              Notez et découvrez les artisans boulangers de votre quartier — baguettes, croissants, pains de campagne et bien plus.
-            </p>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {!isMobile && (
+              <p style={{ fontSize: 14, color: "#FAF3E4AA", lineHeight: 1.65, marginBottom: 28, maxWidth: 360 }}>
+                Notez et découvrez les artisans boulangers de votre quartier — baguettes, croissants, pains de campagne et bien plus.
+              </p>
+            )}
+            {isMobile ? (
               <button onClick={() => onNavigate("bakeries")}
-                style={{ ...css.btnGold, width: "auto", padding: isMobile ? "10px 18px" : "11px 24px", fontSize: isMobile ? 13 : 14 }}>
-                🏪 Explorer les boulangeries
+                style={{ width: "100%", background: "#ffffff12", border: "1px solid #ffffff28", color: "#FAF3E4AA", padding: "12px 16px", borderRadius: 10, fontSize: 14, cursor: "pointer", fontFamily: "inherit", textAlign: "left", display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <span style={{ fontSize: 16 }}>🔍</span>
+                <span>Rechercher une boulangerie…</span>
               </button>
+            ) : null}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {!isMobile && (
+                <button onClick={() => onNavigate("bakeries")}
+                  style={{ ...css.btnGold, width: "auto", padding: "11px 24px", fontSize: 14 }}>
+                  🏪 Explorer les boulangeries
+                </button>
+              )}
               <button onClick={() => onNavigate("rankings")}
-                style={{ background: "#ffffff12", border: "1px solid #ffffff28", color: "#FAF3E4", padding: isMobile ? "10px 14px" : "11px 20px", borderRadius: 10, fontSize: isMobile ? 13 : 14, cursor: "pointer", fontFamily: "inherit" }}>
-                🏆 Voir les classements
+                style={{ background: isMobile ? `linear-gradient(135deg, ${T.gold}, #E8B84B)` : "#ffffff12", border: isMobile ? "none" : "1px solid #ffffff28", color: isMobile ? "white" : "#FAF3E4", padding: isMobile ? "11px 20px" : "11px 20px", borderRadius: 10, fontSize: isMobile ? 14 : 14, cursor: "pointer", fontFamily: "inherit", fontWeight: isMobile ? 700 : 400, width: isMobile ? "100%" : "auto", boxShadow: isMobile ? `0 3px 14px ${T.gold}44` : "none" }}>
+                🏆 {isMobile ? "Voir les classements" : "Voir les classements"}
               </button>
             </div>
           </div>
@@ -1984,7 +2080,7 @@ function HomeView({ onNavigate, onShowAuth }) {
                 Voir les classements →
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 16 }}>
+            <div style={isMobile ? { display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, WebkitOverflowScrolling: "touch", scrollbarWidth: "none" } : { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
               {[...productTypes]
                 .sort((a, b) => {
                   const totA = (allRankings[a.id] || []).reduce((s, r) => s + (r.rating_count || 0), 0);
@@ -2000,7 +2096,7 @@ function HomeView({ onNavigate, onShowAuth }) {
                     : [];
                   return (
                     <div key={pt.id} onClick={() => onNavigate("rankings")}
-                      style={{ background: "white", borderRadius: 16, overflow: "hidden", border: `1px solid ${T.border}`, cursor: "pointer", boxShadow: "0 2px 10px rgba(44,24,16,0.06)", transition: "transform 0.18s, box-shadow 0.18s" }}
+                      style={{ background: "white", borderRadius: 16, overflow: "hidden", border: `1px solid ${T.border}`, cursor: "pointer", boxShadow: "0 2px 10px rgba(44,24,16,0.06)", transition: "transform 0.18s, box-shadow 0.18s", flexShrink: 0, minWidth: isMobile ? 240 : "auto" }}
                       onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(44,24,16,0.12)"; }}
                       onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 10px rgba(44,24,16,0.06)"; }}>
                       <div style={{ background: T.dark, padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -2044,20 +2140,20 @@ function HomeView({ onNavigate, onShowAuth }) {
           </section>
         )}
 
-        {/* ── Boulangeries ──────────────────────────────── */}
-        {bakeries.length > 0 && (
-          <section style={{ marginBottom: isMobile ? 40 : 64 }}>
+        {/* ── Boulangeries — desktop uniquement ────────── */}
+        {!isMobile && bakeries.length > 0 && (
+          <section style={{ marginBottom: 64 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
               <div>
-                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 22 : 28, color: T.dark }}>🏪 Boulangeries</h2>
-                {!isMobile && <p style={{ color: T.muted, fontSize: 14, marginTop: 4, fontStyle: "italic" }}>Toutes les boulangeries artisanales recensées</p>}
+                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 28, color: T.dark }}>🏪 Boulangeries</h2>
+                <p style={{ color: T.muted, fontSize: 14, marginTop: 4, fontStyle: "italic" }}>Toutes les boulangeries artisanales recensées</p>
               </div>
               <button onClick={() => onNavigate("bakeries")} style={{ background: "none", border: "none", color: T.gold, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>
                 Voir toutes →
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
-              {bakeries.slice(0, isMobile ? 4 : 8).map(bakery => {
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+              {bakeries.slice(0, 8).map(bakery => {
                 const rank = overallRanking.find(r => r.bakery.id === bakery.id);
                 return (
                   <div key={bakery.id} onClick={() => onNavigate("bakeries")}
@@ -2074,38 +2170,40 @@ function HomeView({ onNavigate, onShowAuth }) {
           </section>
         )}
 
-        {/* ── CTA bas de page ──────────────── */}
-        <section>
-          <div style={{ background: "white", border: `1px solid ${T.border}`, borderRadius: 16, padding: isMobile ? "24px 20px" : "28px 36px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
-            {user ? (
-              <>
-                <div>
-                  <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 18 : 22, color: T.dark, marginBottom: 6 }}>⭐ Notez une boulangerie</h3>
-                  <p style={{ color: T.muted, fontSize: isMobile ? 13 : 14, lineHeight: 1.55, maxWidth: 480 }}>
-                    Trouvez une boulangerie et partagez votre avis sur ses produits.
-                  </p>
-                </div>
-                <button onClick={() => onNavigate("bakeries")}
-                  style={{ ...css.btnGold, width: "auto", padding: "12px 28px", flexShrink: 0 }}>
-                  Choisir une boulangerie
-                </button>
-              </>
-            ) : (
-              <>
-                <div>
-                  <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 18 : 22, color: T.dark, marginBottom: 6 }}>✍️ Partagez votre expertise</h3>
-                  <p style={{ color: T.muted, fontSize: isMobile ? 13 : 14, lineHeight: 1.55, maxWidth: 480 }}>
-                    Créez un compte gratuit pour noter les boulangeries et contribuer au guide artisanal de Montréal.
-                  </p>
-                </div>
-                <button onClick={onShowAuth}
-                  style={{ ...css.btnGold, width: "auto", padding: "12px 28px", flexShrink: 0 }}>
-                  Créer un compte
-                </button>
-              </>
-            )}
-          </div>
-        </section>
+        {/* ── CTA bas de page — masqué sur mobile si connecté (FAB gère ça) ── */}
+        {(!isMobile || !user) && (
+          <section>
+            <div style={{ background: "white", border: `1px solid ${T.border}`, borderRadius: 16, padding: isMobile ? "24px 20px" : "28px 36px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
+              {user ? (
+                <>
+                  <div>
+                    <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 18 : 22, color: T.dark, marginBottom: 6 }}>⭐ Notez une boulangerie</h3>
+                    <p style={{ color: T.muted, fontSize: 14, lineHeight: 1.55, maxWidth: 480 }}>
+                      Trouvez une boulangerie et partagez votre avis sur ses produits.
+                    </p>
+                  </div>
+                  <button onClick={() => onNavigate("bakeries")}
+                    style={{ ...css.btnGold, width: "auto", padding: "12px 28px", flexShrink: 0 }}>
+                    Choisir une boulangerie
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <h3 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 18 : 22, color: T.dark, marginBottom: 6 }}>✍️ Partagez votre expertise</h3>
+                    <p style={{ color: T.muted, fontSize: isMobile ? 13 : 14, lineHeight: 1.55, maxWidth: 480 }}>
+                      Créez un compte gratuit pour noter les boulangeries et contribuer au guide artisanal de Montréal.
+                    </p>
+                  </div>
+                  <button onClick={onShowAuth}
+                    style={{ ...css.btnGold, width: isMobile ? "100%" : "auto", padding: "12px 28px", flexShrink: 0 }}>
+                    Créer un compte
+                  </button>
+                </>
+              )}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
@@ -2240,12 +2338,22 @@ function AuthModal({ onClose }) {
 
   return (
     <Modal title={tab === "login" ? "Se connecter" : "Créer un compte"} onClose={onClose} maxWidth={380}>
-      <div style={{ display: "flex", gap: 4, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: 4, marginBottom: 24 }}>
+      <div style={{ display: "flex", gap: 4, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: 4, marginBottom: 20 }}>
         {[["login", "Connexion"], ["signup", "Créer un compte"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
-            style={{ flex: 1, padding: "7px 0", border: "none", borderRadius: 6, background: tab === id ? T.dark : "transparent", color: tab === id ? "#FAF3E4" : T.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>{label}</button>
+            style={{ flex: 1, padding: "7px 0", border: "none", borderRadius: 6, background: tab === id ? T.dark : "transparent", color: tab === id ? "#FAF3E4" : T.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>{label}</button>
         ))}
       </div>
+      {tab === "signup" && (
+        <div style={{ background: `${T.gold}12`, border: `1px solid ${T.gold}30`, borderRadius: 10, padding: "12px 14px", marginBottom: 20 }}>
+          <div style={{ fontSize: 13, color: T.dark, lineHeight: 1.55 }}>
+            <div style={{ marginBottom: 4, fontWeight: 600, color: T.dark }}>Pourquoi créer un compte ?</div>
+            <div style={{ color: T.muted }}>✔ Notez les boulangeries et leurs produits</div>
+            <div style={{ color: T.muted }}>✔ Retrouvez tous vos avis dans votre profil</div>
+            <div style={{ color: T.muted }}>✔ Modifiez vos avis à tout moment</div>
+          </div>
+        </div>
+      )}
       {tab === "signup" && (
         <Field label="Nom d'utilisateur">
           <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ex : marie_mtl" style={css.input} />
@@ -2278,19 +2386,16 @@ const VIEWS = [
 ];
 
 function Shell() {
-  const { loading, isAdmin, isMobile } = useApp();
-  const { user, logout }               = useUserAuth();
-  const [view,           setView]           = useState("home");
-  const [showAuth,       setShowAuth]       = useState(false);
-  const [showAdmin,      setShowAdmin]      = useState(false);
-  const [showFeedback,   setShowFeedback]   = useState(false);
+  const { loading, isMobile } = useApp();
+  const { user }                       = useUserAuth();
+  const [view,         setView]         = useState("home");
+  const [showAuth,     setShowAuth]     = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   if (loading) return <BaguetteLoader />;
 
   const isLegalView   = view === "cgu" || view === "mentions";
   const isProfileView = view === "profile";
-
-  const adminBtnBottom = isMobile ? 78 : 20;
 
   return (
     <div style={{ fontFamily: '"EB Garamond", Georgia, serif', background: T.bg, minHeight: "100vh", color: T.dark }}>
@@ -2332,16 +2437,11 @@ function Shell() {
           {/* ── Auth ── */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             {user ? (
-              <>
-                <button onClick={() => setView("profile")} title={`Mon profil — @${user.username}`}
-                  style={{ display: "flex", alignItems: "center", gap: 8, background: `${T.gold}18`, border: `1.5px solid ${T.gold}55`, color: "#FAF3E4", padding: isMobile ? "7px 10px" : "8px 14px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit", fontSize: 14, transition: "all 0.18s", flexShrink: 0 }}>
-                  <span style={{ fontSize: isMobile ? 17 : 16 }}>👤</span>
-                  {!isMobile && <span style={{ fontSize: 13, color: `${T.gold}DD`, fontStyle: "italic" }}>@{user.username}</span>}
-                </button>
-                <button onClick={logout} style={{ background: "none", border: "1px solid #FFFFFF22", color: "#FAF3E460", padding: isMobile ? "6px 12px" : "8px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>
-                  {isMobile ? "↪" : "Déconnexion"}
-                </button>
-              </>
+              <button onClick={() => setView("profile")} title={`Mon profil — @${user.username}`}
+                style={{ display: "flex", alignItems: "center", gap: 8, background: `${T.gold}18`, border: `1.5px solid ${T.gold}55`, color: "#FAF3E4", padding: isMobile ? "7px 10px" : "8px 14px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit", fontSize: 14, transition: "all 0.18s", flexShrink: 0 }}>
+                <span style={{ fontSize: isMobile ? 17 : 16 }}>👤</span>
+                {!isMobile && <span style={{ fontSize: 13, color: `${T.gold}DD`, fontStyle: "italic" }}>@{user.username}</span>}
+              </button>
             ) : (
               <button onClick={() => setShowAuth(true)} style={{ background: `linear-gradient(135deg, ${T.gold}, #E8B84B)`, border: "none", color: "white", padding: isMobile ? "8px 16px" : "10px 22px", borderRadius: 9, fontSize: isMobile ? 13 : 14, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, boxShadow: `0 3px 14px ${T.gold}44`, whiteSpace: "nowrap" }}>
                 {isMobile ? "Connexion" : "Se connecter"}
@@ -2370,25 +2470,16 @@ function Shell() {
       {/* ── Footer (desktop seulement) ── */}
       {!isMobile && <Footer onNavigate={setView} />}
 
-      {/* ── Panel admin ── */}
-      {showAdmin && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(28,15,7,0.7)", overflowY: "auto" }}>
-          <div style={{ background: T.bg, minHeight: "100vh", padding: isMobile ? 16 : 32, maxWidth: 1080, margin: "0 auto", position: "relative" }}>
-            <button onClick={() => setShowAdmin(false)} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", fontSize: 28, color: T.muted, cursor: "pointer" }}>×</button>
-            <AdminView />
-          </div>
-        </div>
-      )}
-
       {showAuth     && <AuthModal      onClose={() => setShowAuth(false)} />}
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
-      {/* ── Bouton admin (flottant) ── */}
-      <button onClick={() => setShowAdmin(true)} title="Admin"
-        style={{ position: "fixed", bottom: adminBtnBottom, right: 16, background: T.dark, border: `1px solid ${T.gold}44`, color: `${T.gold}88`, width: 34, height: 34, borderRadius: "50%", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", zIndex: 200 }}>
-        🔐
-      </button>
-      {isAdmin && <span style={{ position: "fixed", bottom: adminBtnBottom + 26, right: 19, width: 8, height: 8, borderRadius: "50%", background: "#2C6E2C", zIndex: 201 }} />}
+      {/* ── FAB « ★ Donner un avis » — mobile + connecté uniquement ── */}
+      {isMobile && user && !isLegalView && !isProfileView && view !== "bakeries" && (
+        <button onClick={() => setView("bakeries")}
+          style={{ position: "fixed", bottom: 76, left: "50%", transform: "translateX(-50%)", zIndex: 195, background: `linear-gradient(135deg, ${T.gold}, #E8B84B)`, color: "white", border: "none", borderRadius: 28, padding: "13px 28px", fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: `0 4px 20px ${T.gold}66`, display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
+          ★ Donner un avis
+        </button>
+      )}
 
       {/* ── Navigation mobile en bas ── */}
       {isMobile && (

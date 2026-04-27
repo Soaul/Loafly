@@ -101,6 +101,31 @@ def list_ratings():
     return success(ratings)
 
 
+@ratings_bp.patch("/<rating_id>")
+@user_required
+def update_rating(rating_id: str):
+    """Modifie un avis — uniquement par son auteur."""
+    db     = get_db()
+    result = db.table("ratings").select("user_id").eq("id", rating_id).maybe_single().execute()
+    if not result.data:
+        return error("Avis introuvable", "NOT_FOUND", 404)
+    if result.data["user_id"] != g.user_id:
+        return error("Non autorisé", "FORBIDDEN", 403)
+
+    body   = request.get_json(silent=True) or {}
+    fields = {}
+    if "note" in body:
+        fields["note"] = str(body["note"]).strip()
+    if "scores" in body and isinstance(body["scores"], dict):
+        fields["scores"] = body["scores"]
+
+    if not fields:
+        return error("Aucun champ à mettre à jour", "NO_FIELDS", 400)
+
+    updated = db.table("ratings").update(fields).eq("id", rating_id).execute()
+    return success(updated.data[0], "Avis modifié")
+
+
 @ratings_bp.delete("/<rating_id>")
 @admin_required
 def delete_rating(rating_id: str):
