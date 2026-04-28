@@ -756,7 +756,7 @@ function AddRatingModal({ bakery, productTypes, defaultPtId, onClose, onSave }) 
   );
 }
 
-function ProductRankingView({ forcedPtId, onShowAuth }) {
+function ProductRankingView({ forcedPtId, onShowAuth, onNavigateToBakery }) {
   const { productTypes, user }                                    = useApp();
   const { submitRating }                                          = useRatings();
   const { productRanking, loadingProduct, fetchProductRanking }   = useRankings();
@@ -787,7 +787,8 @@ function ProductRankingView({ forcedPtId, onShowAuth }) {
               <span style={{ fontSize: 36 }}>🏆</span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 11, color: T.gold, textTransform: "uppercase", letterSpacing: "0.12em" }}>Meilleure {pt?.name} de Montréal</div>
-                <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 22, fontWeight: 700, marginTop: 2 }}>{productRanking[0].bakery.name}</div>
+                <div onClick={() => onNavigateToBakery?.(productRanking[0].bakery.id)}
+                  style={{ fontFamily: '"Playfair Display", serif', fontSize: 22, fontWeight: 700, marginTop: 2, cursor: onNavigateToBakery ? "pointer" : "default", textDecoration: "underline", textDecorationColor: `${T.gold}44` }}>{productRanking[0].bakery.name}</div>
                 <div style={{ fontSize: 13, color: "#FAF3E4AA", marginTop: 2 }}>
                   {productRanking[0].overall_average.toFixed(2)} / 5 · {productRanking[0].rating_count} avis · {productRanking[0].bakery.neighborhood || "Montréal"}
                 </div>
@@ -814,7 +815,8 @@ function ProductRankingView({ forcedPtId, onShowAuth }) {
                   }
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.dark, fontWeight: 700 }}>{bakery.name}</div>
+                  <div onClick={() => onNavigateToBakery?.(bakery.id)}
+                  style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.dark, fontWeight: 700, cursor: onNavigateToBakery ? "pointer" : "default", display: "inline-block", textDecoration: "underline", textDecorationColor: `${T.gold}44` }}>{bakery.name}</div>
                   {bakery.neighborhood && <div style={{ fontSize: 13, color: T.muted, marginTop: 2 }}>{bakery.neighborhood}</div>}
                   {pt && (
                     <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "4px 16px" }}>
@@ -851,7 +853,7 @@ function ProductRankingView({ forcedPtId, onShowAuth }) {
   );
 }
 
-function OverallRankingView({ onShowAuth }) {
+function OverallRankingView({ onShowAuth, onNavigateToBakery }) {
   const { productTypes, user }                                = useApp();
   const { submitRating }                                      = useRatings();
   const { overallRanking, loadingOverall, fetchOverallRanking } = useRankings();
@@ -878,7 +880,8 @@ function OverallRankingView({ onShowAuth }) {
             {overallRanking.slice(0, 3).map(({ bakery, overall_average, product_count, total_ratings }, i) => (
               <div key={bakery.id} style={{ flex: i === 0 ? "1 1 auto" : "0 1 auto" }}>
                 <div style={{ fontSize: i === 0 ? 28 : 20, marginBottom: 2 }}>{medals[i]}</div>
-                <div style={{ fontFamily: '"Playfair Display", serif', fontSize: i === 0 ? 22 : 17, fontWeight: 700 }}>{bakery.name}</div>
+                <div onClick={() => onNavigateToBakery?.(bakery.id)}
+                  style={{ fontFamily: '"Playfair Display", serif', fontSize: i === 0 ? 22 : 17, fontWeight: 700, cursor: onNavigateToBakery ? "pointer" : "default", textDecoration: "underline", textDecorationColor: `${T.gold}44` }}>{bakery.name}</div>
                 <div style={{ fontSize: 13, color: "#FAF3E4BB", marginTop: 2 }}>{overall_average.toFixed(2)} / 5 · {product_count} produit{product_count > 1 ? "s" : ""} · {total_ratings} avis</div>
               </div>
             ))}
@@ -901,7 +904,8 @@ function OverallRankingView({ onShowAuth }) {
             <div style={{ fontSize: 24, minWidth: 36, textAlign: "center" }}>{medals[i] ?? `#${i + 1}`}</div>
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.dark }}>{bakery.name}</span>
+                <span onClick={() => onNavigateToBakery?.(bakery.id)}
+                  style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, color: T.dark, cursor: onNavigateToBakery ? "pointer" : "default", textDecoration: "underline", textDecorationColor: `${T.gold}44` }}>{bakery.name}</span>
                 {bakery.neighborhood && <span style={{ fontSize: 13, color: T.muted }}>{bakery.neighborhood}</span>}
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
@@ -934,7 +938,7 @@ function OverallRankingView({ onShowAuth }) {
   );
 }
 
-function RankingsView({ onShowAuth }) {
+function RankingsView({ onShowAuth, onNavigateToBakery }) {
   const { productTypes, isMobile } = useApp();
   const [sub,  setSub]  = useState("overall");
   const [ptId, setPtId] = useState(null);
@@ -977,8 +981,8 @@ function RankingsView({ onShowAuth }) {
         </div>
       </div>
 
-      {sub === "product" && ptId && <ProductRankingView forcedPtId={ptId} onShowAuth={onShowAuth} />}
-      {sub === "overall" && <OverallRankingView onShowAuth={onShowAuth} />}
+      {sub === "product" && ptId && <ProductRankingView forcedPtId={ptId} onShowAuth={onShowAuth} onNavigateToBakery={onNavigateToBakery} />}
+      {sub === "overall" && <OverallRankingView onShowAuth={onShowAuth} onNavigateToBakery={onNavigateToBakery} />}
     </div>
   );
 }
@@ -1086,26 +1090,92 @@ function EditBakeryModal({ bakery, onClose, onSave }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  ProductDetailModal  —  détail complet d'un produit (desktop)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ProductDetailModal({ product, bakeryName, onClose, onAddRating, user, onShowAuth }) {
+  const { product_type, aggregated_scores, overall_average, rating_count, avg_price, individual_ratings } = product;
+  return (
+    <Modal title={`${product_type.emoji} ${product_type.name}`} onClose={onClose} maxWidth={600}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 13, color: T.muted, marginBottom: 14 }}>{bakeryName}</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+          <span style={{ background: T.gold, color: "white", padding: "4px 14px", borderRadius: 20, fontSize: 15, fontWeight: 700 }}>⌀ {overall_average.toFixed(2)} / 5</span>
+          <span style={{ background: `${T.gold}22`, color: T.gold, border: `1px solid ${T.gold}55`, padding: "4px 10px", borderRadius: 20, fontSize: 13 }}>{rating_count} avis</span>
+          {avg_price != null && (
+            <span style={{ background: "#E8F5E9", color: "#2C6E2C", border: "1px solid #A5D6A7", padding: "4px 12px", borderRadius: 20, fontSize: 13, fontWeight: 600 }}>
+              ~{avg_price.toFixed(2)} $ moy.
+            </span>
+          )}
+        </div>
+        {user
+          ? <button onClick={onAddRating} style={{ ...css.btnGold, width: "auto", padding: "10px 24px" }}>★ Donner mon avis</button>
+          : <button onClick={onShowAuth} style={{ ...css.btnGold, width: "auto", padding: "10px 24px" }}>Se connecter pour noter</button>
+        }
+      </div>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>Scores détaillés</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8 }}>
+          {Object.entries(aggregated_scores).map(([name, score]) => <ScoreBar key={name} label={name} score={score} />)}
+        </div>
+      </div>
+      <PriceChart individualRatings={individual_ratings} />
+      {individual_ratings.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>Avis ({individual_ratings.length})</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto" }}>
+            {individual_ratings.map((r) => (
+              <div key={r.id} style={{ background: T.bg, borderRadius: 8, padding: "10px 14px", display: "flex", gap: 12 }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: T.dark, display: "flex", alignItems: "center", justifyContent: "center", color: T.gold, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                  {(r.author_name || "A")[0].toUpperCase()}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: T.dark }}>{r.author_name}</span>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {r.price != null && <span style={{ fontSize: 12, color: "#2C6E2C", fontWeight: 600 }}>{Number(r.price).toFixed(2)} $</span>}
+                      <span style={{ fontSize: 12, color: T.gold, fontWeight: 600 }}>{(Object.values(r.scores).reduce((a, b) => a + b, 0) / Object.values(r.scores).length).toFixed(1)}/5</span>
+                    </div>
+                  </div>
+                  {r.note && <p style={{ fontSize: 13, color: T.muted, fontStyle: "italic", marginTop: 4 }}>« {r.note} »</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  views/BakeriesView
 // ─────────────────────────────────────────────────────────────────────────────
 
-function BakeriesView({ onShowAuth }) {
+function BakeriesView({ onShowAuth, initialSelectedId, onClearInitialId }) {
   const { productTypes, isAdmin, user, isMobile }             = useApp();
   const { bakeries, addBakery, updateBakery, removeBakery }   = useBakeries();
   const { submitRating }                                      = useRatings();
 
-  const [selectedId,     setSelectedId]     = useState(null);
-  const [bakeryDetail,   setBakeryDetail]   = useState(null);
-  const [loadingDetail,  setLoadingDetail]  = useState(false);
-  const [showAddBakery,  setShowAddBakery]  = useState(false);
-  const [showEditBakery, setShowEditBakery] = useState(false);
-  const [showAddRating,    setShowAddRating]    = useState(false);
-  const [search,           setSearch]           = useState("");
-  const [productFilter,    setProductFilter]    = useState(null);
+  const [selectedId,         setSelectedId]         = useState(null);
+  const [bakeryDetail,       setBakeryDetail]       = useState(null);
+  const [loadingDetail,      setLoadingDetail]      = useState(false);
+  const [showAddBakery,      setShowAddBakery]      = useState(false);
+  const [showEditBakery,     setShowEditBakery]     = useState(false);
+  const [showAddRating,      setShowAddRating]      = useState(false);
+  const [ratingDefaultPtId,  setRatingDefaultPtId]  = useState(null);
+  const [selectedProduct,    setSelectedProduct]    = useState(null);
+  const [search,             setSearch]             = useState("");
+  const [productFilter,      setProductFilter]      = useState(null);
   const [neighborhoodFilter, setNeighborhoodFilter] = useState(null);
-  const [scoreMap,         setScoreMap]         = useState({});
+  const [scoreMap,           setScoreMap]           = useState({});
 
   // Charger les scores globaux pour les afficher sur les cartes
+  // Consume initialSelectedId once on mount
+  useEffect(() => {
+    if (initialSelectedId) { setSelectedId(initialSelectedId); onClearInitialId?.(); }
+  }, []);
+
   useEffect(() => {
     ApiClient.rankings.overall().then((data) => {
       if (!Array.isArray(data)) return;
@@ -1118,7 +1188,6 @@ function BakeriesView({ onShowAuth }) {
   const selected = bakeries.find((b) => b.id === selectedId);
   const q = search.trim().toLowerCase();
 
-  // Quartiers disponibles parmi les boulangeries affichées
   const neighborhoods = [...new Set(bakeries.map((b) => b.neighborhood).filter(Boolean))].sort();
 
   const filtered = bakeries
@@ -1131,6 +1200,7 @@ function BakeriesView({ onShowAuth }) {
 
   useEffect(() => {
     setProductFilter(null);
+    setSelectedProduct(null);
     if (!selectedId) { setBakeryDetail(null); return; }
     setLoadingDetail(true);
     ApiClient.bakeries.get(selectedId)
@@ -1159,13 +1229,20 @@ function BakeriesView({ onShowAuth }) {
       setShowAddRating(false);
       const detail = await ApiClient.bakeries.get(selectedId);
       setBakeryDetail(detail);
+      if (selectedProduct) {
+        const updated = detail.products?.find(p => p.product_type.id === selectedProduct.product_type.id);
+        if (updated) setSelectedProduct(updated);
+      }
     }
   };
+
+  const openAddRating = (defaultPtId = null) => { setRatingDefaultPtId(defaultPtId); setShowAddRating(true); };
 
   const handleDelete = () => {
     removeBakery(selectedId);
     setSelectedId(null);
     setBakeryDetail(null);
+    setSelectedProduct(null);
   };
 
   const bakeryListJSX = (
@@ -1176,12 +1253,11 @@ function BakeriesView({ onShowAuth }) {
         <input
           value={search}
           onChange={(e) => { setSearch(e.target.value); setSelectedId(null); setNeighborhoodFilter(null); }}
-          placeholder="Rechercher…"
+          placeholder="Rechercher une boulangerie…"
           style={{ ...css.input, paddingLeft: 38 }}
         />
       </div>
 
-      {/* Filtre quartier — pills scrollables */}
       {neighborhoods.length > 0 && (
         <div style={{ overflowX: "auto", paddingBottom: 8, marginBottom: 12, WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
           <div style={{ display: "flex", gap: 6, width: "max-content" }}>
@@ -1212,33 +1288,33 @@ function BakeriesView({ onShowAuth }) {
           const score = scoreMap[b.id];
           const isSelected = selectedId === b.id;
           return (
-          <div key={b.id} onClick={() => setSelectedId(b.id)}
-            style={{ padding: "13px 16px", marginBottom: 8, borderRadius: 12, cursor: "pointer", background: isSelected ? T.dark : "white", color: isSelected ? "#FAF3E4" : T.dark, border: `2px solid ${isSelected ? T.gold : T.border}`, transition: "all 0.15s", display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: '"Playfair Display", serif', fontWeight: 600, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{b.name}</div>
-              {b.neighborhood && <div style={{ fontSize: 12, opacity: 0.65, marginTop: 2 }}>{b.neighborhood}</div>}
+            <div key={b.id} onClick={() => setSelectedId(b.id)}
+              style={{ padding: "13px 16px", marginBottom: 8, borderRadius: 12, cursor: "pointer", background: isSelected ? T.dark : "white", color: isSelected ? "#FAF3E4" : T.dark, border: `2px solid ${isSelected ? T.gold : T.border}`, transition: "all 0.15s", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: '"Playfair Display", serif', fontWeight: 600, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{b.name}</div>
+                {b.neighborhood && <div style={{ fontSize: 12, opacity: 0.65, marginTop: 2 }}>{b.neighborhood}</div>}
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                {score != null
+                  ? <div style={{ fontSize: 17, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>{score.toFixed(1)} ★</div>
+                  : <div style={{ fontSize: 12, opacity: 0.4 }}>—</div>
+                }
+                <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>{b.rating_count ?? 0} avis</div>
+              </div>
             </div>
-            <div style={{ textAlign: "right", flexShrink: 0 }}>
-              {score != null ? (
-                <div style={{ fontSize: 17, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>{score.toFixed(1)} ★</div>
-              ) : (
-                <div style={{ fontSize: 12, opacity: 0.4 }}>—</div>
-              )}
-              <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>{b.rating_count ?? 0} avis</div>
-            </div>
-          </div>
           );
         })}
       </div>
     </div>
   );
 
-  const bakeryDetailJSX = bakeryDetail && (
+  // ── Desktop bakery detail (full expanded cards, product header clickable) ──
+  const desktopDetailJSX = bakeryDetail && (
     <>
-      <div style={{ background: T.dark, borderRadius: 16, padding: isMobile ? "20px 18px" : "24px 28px", marginBottom: 20, color: "#FAF3E4" }}>
+      <div style={{ background: T.dark, borderRadius: 16, padding: "24px 28px", marginBottom: 20, color: "#FAF3E4" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
           <div style={{ minWidth: 0 }}>
-            <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: isMobile ? 20 : 24, color: "#FAF3E4" }}>{bakeryDetail.name}</h2>
+            <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 24, color: "#FAF3E4" }}>{bakeryDetail.name}</h2>
             {bakeryDetail.neighborhood && <p style={{ color: `${T.gold}CC`, marginTop: 4, fontSize: 14 }}>{bakeryDetail.neighborhood}</p>}
             {bakeryDetail.address && <p style={{ color: "#FAF3E460", fontSize: 12, marginTop: 2 }}>{bakeryDetail.address}</p>}
           </div>
@@ -1251,9 +1327,7 @@ function BakeriesView({ onShowAuth }) {
         </div>
         <div style={{ marginTop: 18 }}>
           {user ? (
-            <button onClick={() => setShowAddRating(true)} style={{ ...css.btnGold, width: "auto", padding: "11px 28px", fontSize: 15 }}>
-              ★ Donner mon avis
-            </button>
+            <button onClick={() => openAddRating()} style={{ ...css.btnGold, width: "auto", padding: "11px 28px", fontSize: 15 }}>★ Donner mon avis</button>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <span style={{ fontSize: 13, color: "#FAF3E480", fontStyle: "italic" }}>Connectez-vous pour laisser un avis</span>
@@ -1267,7 +1341,6 @@ function BakeriesView({ onShowAuth }) {
         <EmptyState text="Aucun avis pour cette boulangerie." />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* ── Filtre par produit ── */}
           {bakeryDetail.products.length > 1 && (
             <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, WebkitOverflowScrolling: "touch" }}>
               <button onClick={() => setProductFilter(null)}
@@ -1282,89 +1355,222 @@ function BakeriesView({ onShowAuth }) {
               ))}
             </div>
           )}
-          {bakeryDetail.products.filter(p => productFilter === null || p.product_type.id === productFilter).map(({ product_type, aggregated_scores, overall_average, rating_count, avg_price, individual_ratings }) => (
-            <div key={product_type.id} style={{ background: "white", borderRadius: 14, padding: 22, border: `1px solid ${T.border}` }}>
-              {/* En-tête produit */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-                <span style={{ fontFamily: '"Playfair Display", serif', fontSize: 17 }}>{product_type.emoji} {product_type.name}</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  {avg_price != null && (
-                    <span style={{ background: "#E8F5E9", color: "#2C6E2C", border: "1px solid #A5D6A7", padding: "3px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
-                      ~{avg_price.toFixed(2)} $ moy.
-                    </span>
-                  )}
-                  <span style={{ background: `${T.gold}22`, color: T.gold, border: `1px solid ${T.gold}55`, padding: "3px 10px", borderRadius: 20, fontSize: 12 }}>{rating_count} avis</span>
-                  <span style={{ background: T.gold, color: "white", padding: "4px 14px", borderRadius: 20, fontSize: 14, fontWeight: 600 }}>⌀ {overall_average.toFixed(2)} / 5</span>
+          {bakeryDetail.products.filter(p => productFilter === null || p.product_type.id === productFilter).map((product) => {
+            const { product_type, aggregated_scores, overall_average, rating_count, avg_price, individual_ratings } = product;
+            return (
+              <div key={product_type.id} style={{ background: "white", borderRadius: 14, padding: 22, border: `1px solid ${T.border}` }}>
+                <div onClick={() => setSelectedProduct(product)}
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8, cursor: "pointer" }}
+                  title="Voir le détail complet">
+                  <span style={{ fontFamily: '"Playfair Display", serif', fontSize: 17, display: "flex", alignItems: "center", gap: 6 }}>
+                    {product_type.emoji} {product_type.name}
+                    <span style={{ fontSize: 12, color: T.muted }}>↗</span>
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    {avg_price != null && (
+                      <span style={{ background: "#E8F5E9", color: "#2C6E2C", border: "1px solid #A5D6A7", padding: "3px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>~{avg_price.toFixed(2)} $ moy.</span>
+                    )}
+                    <span style={{ background: `${T.gold}22`, color: T.gold, border: `1px solid ${T.gold}55`, padding: "3px 10px", borderRadius: 20, fontSize: 12 }}>{rating_count} avis</span>
+                    <span style={{ background: T.gold, color: "white", padding: "4px 14px", borderRadius: 20, fontSize: 14, fontWeight: 600 }}>⌀ {overall_average.toFixed(2)} / 5</span>
+                  </div>
                 </div>
-              </div>
-
-              {/* Barres de scores */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, marginBottom: 16 }}>
-                {Object.entries(aggregated_scores).map(([name, score]) => <ScoreBar key={name} label={name} score={score} />)}
-              </div>
-
-              {/* Graphique prix mensuel */}
-              <PriceChart individualRatings={individual_ratings} />
-
-              {/* Avis individuels */}
-              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 14, marginTop: 16 }}>
-                <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Avis individuels</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {individual_ratings.map((r) => (
-                    <div key={r.id} style={{ background: T.bg, borderRadius: 8, padding: "10px 14px", display: "flex", gap: 12 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: T.dark, display: "flex", alignItems: "center", justifyContent: "center", color: T.gold, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                        {(r.author_name || "A")[0].toUpperCase()}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: T.dark }}>{r.author_name}</span>
-                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            {r.price != null && (
-                              <span style={{ fontSize: 12, color: "#2C6E2C", fontWeight: 600 }}>{Number(r.price).toFixed(2)} $</span>
-                            )}
-                            <span style={{ fontSize: 12, color: T.gold, fontWeight: 600 }}>{(Object.values(r.scores).reduce((a, b) => a + b, 0) / Object.values(r.scores).length).toFixed(1)}/5</span>
-                          </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, marginBottom: 16 }}>
+                  {Object.entries(aggregated_scores).map(([name, score]) => <ScoreBar key={name} label={name} score={score} />)}
+                </div>
+                <PriceChart individualRatings={individual_ratings} />
+                <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 14, marginTop: 16 }}>
+                  <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Avis individuels</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {individual_ratings.map((r) => (
+                      <div key={r.id} style={{ background: T.bg, borderRadius: 8, padding: "10px 14px", display: "flex", gap: 12 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: "50%", background: T.dark, display: "flex", alignItems: "center", justifyContent: "center", color: T.gold, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                          {(r.author_name || "A")[0].toUpperCase()}
                         </div>
-                        {r.note && <p style={{ fontSize: 13, color: T.muted, fontStyle: "italic", marginTop: 4 }}>« {r.note} »</p>}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: T.dark }}>{r.author_name}</span>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              {r.price != null && <span style={{ fontSize: 12, color: "#2C6E2C", fontWeight: 600 }}>{Number(r.price).toFixed(2)} $</span>}
+                              <span style={{ fontSize: 12, color: T.gold, fontWeight: 600 }}>{(Object.values(r.scores).reduce((a, b) => a + b, 0) / Object.values(r.scores).length).toFixed(1)}/5</span>
+                            </div>
+                          </div>
+                          {r.note && <p style={{ fontSize: 13, color: T.muted, fontStyle: "italic", marginTop: 4 }}>« {r.note} »</p>}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </>
   );
 
+  const backBtn = (label, onClick) => (
+    <button onClick={onClick}
+      style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 14, padding: "0 0 16px", fontFamily: "inherit" }}>
+      ← {label}
+    </button>
+  );
+
   return (
     <div>
-      {isMobile && selectedId ? (
+      {/* ── Mobile Level 3: Product Detail ── */}
+      {isMobile && selectedId && selectedProduct && bakeryDetail && !loadingDetail && (
         <div>
-          <button onClick={() => { setSelectedId(null); setBakeryDetail(null); }}
-            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 14, padding: "0 0 16px", fontFamily: "inherit" }}>
-            ← Retour à la liste
-          </button>
-          {loadingDetail ? <Spinner /> : bakeryDetailJSX}
-        </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "300px 1fr", gap: 28, alignItems: "start" }}>
-          {bakeryListJSX}
-          {!isMobile && (
-            <div>
-              {!selected
-                ? <EmptyState emoji="🏪" text="Sélectionnez une boulangerie dans la liste" />
-                : loadingDetail ? <Spinner />
-                : bakeryDetailJSX}
+          {backBtn(bakeryDetail.name, () => setSelectedProduct(null))}
+          <div style={{ background: T.dark, borderRadius: 16, padding: "20px 18px", marginBottom: 20, color: "#FAF3E4" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
+              <span style={{ fontSize: 36, flexShrink: 0 }}>{selectedProduct.product_type.emoji}</span>
+              <div>
+                <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 22, fontWeight: 700 }}>{selectedProduct.product_type.name}</div>
+                <div style={{ color: `${T.gold}CC`, fontSize: 13, marginTop: 2 }}>{bakeryDetail.name}</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+              <span style={{ background: T.gold, color: "white", padding: "4px 14px", borderRadius: 20, fontSize: 15, fontWeight: 700 }}>⌀ {selectedProduct.overall_average.toFixed(2)} / 5</span>
+              <span style={{ background: `${T.gold}22`, color: T.gold, border: `1px solid ${T.gold}55`, padding: "4px 10px", borderRadius: 20, fontSize: 13 }}>{selectedProduct.rating_count} avis</span>
+              {selectedProduct.avg_price != null && (
+                <span style={{ background: "#1A3A1A", color: "#6FCF6F", border: "1px solid #2A5A2A", padding: "4px 12px", borderRadius: 20, fontSize: 13, fontWeight: 600 }}>
+                  ~{selectedProduct.avg_price.toFixed(2)} $ moy.
+                </span>
+              )}
+            </div>
+            {user
+              ? <button onClick={() => openAddRating(selectedProduct.product_type.id)} style={{ ...css.btnGold, width: "100%", padding: "12px 0", fontSize: 15 }}>★ Donner mon avis</button>
+              : <button onClick={onShowAuth} style={{ width: "100%", padding: "12px 0", borderRadius: 9, border: "1px solid #FFFFFF33", background: "transparent", color: "#FAF3E4CC", fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>Se connecter pour noter</button>
+            }
+          </div>
+          <div style={{ background: "white", borderRadius: 14, padding: "18px 16px", marginBottom: 16, border: `1px solid ${T.border}` }}>
+            <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>Scores détaillés</div>
+            {Object.entries(selectedProduct.aggregated_scores).map(([name, score]) => <ScoreBar key={name} label={name} score={score} />)}
+          </div>
+          <PriceChart individualRatings={selectedProduct.individual_ratings} />
+          {selectedProduct.individual_ratings.length > 0 && (
+            <div style={{ background: "white", borderRadius: 14, padding: "18px 16px", marginTop: 16, border: `1px solid ${T.border}` }}>
+              <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>Avis ({selectedProduct.individual_ratings.length})</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {selectedProduct.individual_ratings.map((r) => (
+                  <div key={r.id} style={{ background: T.bg, borderRadius: 8, padding: "10px 14px", display: "flex", gap: 12 }}>
+                    <div style={{ width: 34, height: 34, borderRadius: "50%", background: T.dark, display: "flex", alignItems: "center", justifyContent: "center", color: T.gold, fontSize: 14, fontWeight: 700, flexShrink: 0 }}>
+                      {(r.author_name || "A")[0].toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: T.dark }}>{r.author_name}</span>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          {r.price != null && <span style={{ fontSize: 12, color: "#2C6E2C", fontWeight: 600 }}>{Number(r.price).toFixed(2)} $</span>}
+                          <span style={{ fontSize: 12, color: T.gold, fontWeight: 600 }}>{(Object.values(r.scores).reduce((a, b) => a + b, 0) / Object.values(r.scores).length).toFixed(1)}/5</span>
+                        </div>
+                      </div>
+                      {r.note && <p style={{ fontSize: 13, color: T.muted, fontStyle: "italic", marginTop: 4 }}>« {r.note} »</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
       )}
 
+      {/* ── Mobile Level 2: Bakery Detail with compact product cards ── */}
+      {isMobile && selectedId && !selectedProduct && (
+        <div>
+          {backBtn("Boulangeries", () => { setSelectedId(null); setBakeryDetail(null); })}
+          {loadingDetail ? <Spinner /> : bakeryDetail && (
+            <>
+              <div style={{ background: T.dark, borderRadius: 16, padding: "20px 18px", marginBottom: 20, color: "#FAF3E4" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 20, color: "#FAF3E4" }}>{bakeryDetail.name}</h2>
+                    {bakeryDetail.neighborhood && <p style={{ color: `${T.gold}CC`, marginTop: 4, fontSize: 13 }}>{bakeryDetail.neighborhood}</p>}
+                    {bakeryDetail.address && <p style={{ color: "#FAF3E455", fontSize: 11, marginTop: 2 }}>{bakeryDetail.address}</p>}
+                  </div>
+                  {isAdmin && (
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button onClick={() => setShowEditBakery(true)} style={{ ...css.btnSm, background: "#FFFFFF15", color: "#FAF3E4CC", border: "1px solid #FFFFFF20" }}>✏️</button>
+                      <button onClick={handleDelete} style={{ ...css.btnGhost, color: "#FAF3E460", border: "1px solid #FFFFFF15", padding: "6px 10px" }}>🗑</button>
+                    </div>
+                  )}
+                </div>
+                {user
+                  ? <button onClick={() => openAddRating()} style={{ ...css.btnGold, width: "100%", padding: "11px 0", fontSize: 15 }}>★ Donner mon avis</button>
+                  : <button onClick={onShowAuth} style={{ width: "100%", padding: "11px 0", borderRadius: 9, border: "1px solid #FFFFFF33", background: "transparent", color: "#FAF3E4CC", fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>Se connecter pour noter</button>
+                }
+              </div>
+
+              {(!bakeryDetail.products || bakeryDetail.products.length === 0) ? (
+                <EmptyState text="Aucun avis pour cette boulangerie." />
+              ) : (
+                <>
+                  <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>
+                    {bakeryDetail.products.length} produit{bakeryDetail.products.length > 1 ? "s" : ""} évalué{bakeryDetail.products.length > 1 ? "s" : ""}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {bakeryDetail.products.map((product) => (
+                      <div key={product.product_type.id} onClick={() => setSelectedProduct(product)}
+                        style={{ background: "white", borderRadius: 14, padding: "16px 18px", border: `1px solid ${T.border}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 14, boxShadow: "0 1px 6px rgba(44,24,16,0.05)", transition: "box-shadow 0.15s, border-color 0.15s" }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = T.gold; e.currentTarget.style.boxShadow = `0 3px 14px ${T.gold}1A`; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.boxShadow = "0 1px 6px rgba(44,24,16,0.05)"; }}>
+                        <span style={{ fontSize: 30, flexShrink: 0 }}>{product.product_type.emoji}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 17, fontWeight: 700, color: T.dark, marginBottom: 4 }}>{product.product_type.name}</div>
+                          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 13, color: T.gold, fontWeight: 700 }}>⌀ {product.overall_average.toFixed(1)} / 5</span>
+                            <span style={{ fontSize: 12, color: T.muted }}>{product.rating_count} avis</span>
+                            {product.avg_price != null && <span style={{ fontSize: 12, color: "#2C6E2C", fontWeight: 600 }}>· ~{product.avg_price.toFixed(2)} $</span>}
+                          </div>
+                          <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {Object.entries(product.aggregated_scores).slice(0, 3).map(([name, score]) => (
+                              <div key={name} style={{ display: "flex", alignItems: "center", gap: 4, background: T.bg, padding: "3px 8px", borderRadius: 10, fontSize: 11 }}>
+                                <span style={{ color: T.muted }}>{name}</span>
+                                <span style={{ color: T.gold, fontWeight: 600 }}>{Number(score).toFixed(1)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 22, color: T.muted, flexShrink: 0 }}>›</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Desktop layout + Mobile Level 1 ── */}
+      {(!isMobile || !selectedId) && (
+        isMobile ? bakeryListJSX : (
+          <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 28, alignItems: "start" }}>
+            {bakeryListJSX}
+            <div>
+              {!selected
+                ? <EmptyState emoji="🏪" text="Sélectionnez une boulangerie dans la liste" />
+                : loadingDetail ? <Spinner />
+                : desktopDetailJSX}
+            </div>
+          </div>
+        )
+      )}
+
+      {/* ── Modals ── */}
       {showAddBakery  && <AddBakeryModal onClose={() => setShowAddBakery(false)} onSave={handleAddBakery} />}
       {showEditBakery && bakeryDetail && <EditBakeryModal bakery={bakeryDetail} onClose={() => setShowEditBakery(false)} onSave={handleEditBakery} />}
-      {showAddRating  && selected && <AddRatingModal bakery={selected} productTypes={productTypes} onClose={() => setShowAddRating(false)} onSave={handleAddRating} />}
+      {showAddRating  && selected && <AddRatingModal bakery={selected} productTypes={productTypes} defaultPtId={ratingDefaultPtId} onClose={() => setShowAddRating(false)} onSave={handleAddRating} />}
+      {!isMobile && selectedProduct && bakeryDetail && (
+        <ProductDetailModal
+          product={selectedProduct}
+          bakeryName={bakeryDetail.name}
+          onClose={() => setSelectedProduct(null)}
+          onAddRating={() => openAddRating(selectedProduct.product_type.id)}
+          user={user}
+          onShowAuth={onShowAuth}
+        />
+      )}
     </div>
   );
 }
@@ -2533,9 +2739,12 @@ const VIEWS = [
 function Shell() {
   const { loading, isMobile } = useApp();
   const { user }                       = useUserAuth();
-  const [view,         setView]         = useState("home");
-  const [showAuth,     setShowAuth]     = useState(false);
-  const [showFeedback, setShowFeedback] = useState(false);
+  const [view,           setView]           = useState("home");
+  const [showAuth,       setShowAuth]       = useState(false);
+  const [showFeedback,   setShowFeedback]   = useState(false);
+  const [pendingBakeryId, setPendingBakeryId] = useState(null);
+
+  const navigateToBakery = (id) => { setPendingBakeryId(id); setView("bakeries"); };
 
   if (loading) return <BaguetteLoader />;
 
@@ -2605,8 +2814,8 @@ function Shell() {
         {isProfileView       && <UserProfileView onBack={() => setView("home")} onShowFeedback={() => setShowFeedback(true)} />}
         {!isLegalView && !isProfileView && view !== "home" && (
           <div style={{ padding: isMobile ? "16px" : "32px", maxWidth: 1080, margin: "0 auto" }}>
-            {view === "rankings" && <RankingsView onShowAuth={() => setShowAuth(true)} />}
-            {view === "bakeries" && <BakeriesView onShowAuth={() => setShowAuth(true)} />}
+            {view === "rankings" && <RankingsView onShowAuth={() => setShowAuth(true)} onNavigateToBakery={navigateToBakery} />}
+            {view === "bakeries" && <BakeriesView onShowAuth={() => setShowAuth(true)} initialSelectedId={pendingBakeryId} onClearInitialId={() => setPendingBakeryId(null)} />}
             {view === "map"      && <MapView />}
           </div>
         )}
