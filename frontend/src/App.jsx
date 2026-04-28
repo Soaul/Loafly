@@ -116,11 +116,11 @@ const ApiClient = {
   // ── Ratings ───────────────────────────────────────────────────────────────
   ratings: {
     submit: (payload, userToken) =>
-      apiFetch("/ratings/", { method: "POST", body: JSON.stringify(payload) }, null, userToken),
+      apiFetch("/ratings/", { method: "POST", body: JSON.stringify(payload) }, userToken),
     mine: (userToken) =>
-      apiFetch("/ratings/mine", {}, null, userToken),
+      apiFetch("/ratings/mine", {}, userToken),
     update: (id, payload, userToken) =>
-      apiFetch(`/ratings/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, null, userToken),
+      apiFetch(`/ratings/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, userToken),
     list: (userToken) =>
       apiFetch("/ratings/", {}, userToken),
     remove: (id, userToken) =>
