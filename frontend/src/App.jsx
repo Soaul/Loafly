@@ -89,6 +89,8 @@ const ApiClient = {
       apiFetch("/users/signup", { method: "POST", body: JSON.stringify({ username, email, password }) }),
     login: (email, password) =>
       apiFetch("/users/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+    me: (userToken) =>
+      apiFetch("/users/me", {}, userToken),
     list: (userToken) =>
       apiFetch("/users/", {}, userToken),
     remove: (id, userToken) =>
@@ -199,6 +201,20 @@ function AppProvider({ children }) {
   useEffect(() => {
     fetchBaseData().finally(() => setLoading(false));
   }, [fetchBaseData]);
+
+  // Si l'utilisateur est connecté mais sans role (ancien cache localStorage), le rafraîchir
+  useEffect(() => {
+    const cached = JSON.parse(localStorage.getItem("loafly_user") || "null");
+    if (cached?.token && !cached?.role) {
+      ApiClient.users.me(cached.token)
+        .then(data => {
+          const updated = { ...cached, role: data.role ?? "user" };
+          localStorage.setItem("loafly_user", JSON.stringify(updated));
+          setUserState(updated);
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   const refresh = useCallback(() => fetchBaseData(), [fetchBaseData]);
 
@@ -656,6 +672,7 @@ function AddRatingModal({ bakery, productTypes, defaultPtId, onClose, onSave }) 
   const [ptId,      setPtId]      = useState(defaultPtId ?? productTypes[0]?.id ?? "");
   const [scores,    setScores]    = useState({});
   const [note,      setNote]      = useState("");
+  const [price,     setPrice]     = useState("");
   const [photoFile, setPhotoFile] = useState(null);
   const [preview,   setPreview]   = useState(null);
   const pt = productTypes.find((p) => p.id === ptId);
@@ -694,11 +711,29 @@ function AddRatingModal({ bakery, productTypes, defaultPtId, onClose, onSave }) 
         </div>
       ))}
 
-      {/* Commentaire */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Commentaire <span style={{ fontStyle: "italic", textTransform: "none" }}>(optionnel)</span></div>
-        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Un mot sur votre dégustation…"
-          style={{ ...css.input, resize: "vertical", minHeight: 80 }} />
+      {/* Prix + Commentaire — ligne horizontale sur desktop */}
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 16 }}>
+        <div style={{ flex: "0 0 130px" }}>
+          <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
+            Prix payé <span style={{ fontStyle: "italic", textTransform: "none" }}>(optionnel)</span>
+          </div>
+          <div style={{ position: "relative" }}>
+            <input
+              type="number" min="0" step="0.25" value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="0.00"
+              style={{ ...css.input, paddingRight: 32 }}
+            />
+            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: T.muted, pointerEvents: "none" }}>$</span>
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
+            Commentaire <span style={{ fontStyle: "italic", textTransform: "none" }}>(optionnel)</span>
+          </div>
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Un mot sur votre dégustation…"
+            style={{ ...css.input, resize: "vertical", minHeight: 68 }} />
+        </div>
       </div>
 
       {/* Photo */}
@@ -712,7 +747,7 @@ function AddRatingModal({ bakery, productTypes, defaultPtId, onClose, onSave }) 
       </div>
 
       <button
-        onClick={() => onSave({ product_type_id: ptId, scores, note, author_name: user?.username ?? "Anonyme" }, photoFile)}
+        onClick={() => onSave({ product_type_id: ptId, scores, note, price: price !== "" ? parseFloat(price) : null, author_name: user?.username ?? "Anonyme" }, photoFile)}
         disabled={!allFilled}
         style={{ ...css.btnGold, opacity: allFilled ? 1 : 0.5, cursor: allFilled ? "pointer" : "default" }}>
         {allFilled ? "Envoyer mon avis ★" : `Notez tous les critères (${Object.values(scores).filter(v => v > 0).length}/${pt?.criteria.length ?? 0})`}
@@ -1247,19 +1282,32 @@ function BakeriesView({ onShowAuth }) {
               ))}
             </div>
           )}
-          {bakeryDetail.products.filter(p => productFilter === null || p.product_type.id === productFilter).map(({ product_type, aggregated_scores, overall_average, rating_count, individual_ratings }) => (
+          {bakeryDetail.products.filter(p => productFilter === null || p.product_type.id === productFilter).map(({ product_type, aggregated_scores, overall_average, rating_count, avg_price, individual_ratings }) => (
             <div key={product_type.id} style={{ background: "white", borderRadius: 14, padding: 22, border: `1px solid ${T.border}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              {/* En-tête produit */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
                 <span style={{ fontFamily: '"Playfair Display", serif', fontSize: 17 }}>{product_type.emoji} {product_type.name}</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  {avg_price != null && (
+                    <span style={{ background: "#E8F5E9", color: "#2C6E2C", border: "1px solid #A5D6A7", padding: "3px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
+                      ~{avg_price.toFixed(2)} $ moy.
+                    </span>
+                  )}
                   <span style={{ background: `${T.gold}22`, color: T.gold, border: `1px solid ${T.gold}55`, padding: "3px 10px", borderRadius: 20, fontSize: 12 }}>{rating_count} avis</span>
                   <span style={{ background: T.gold, color: "white", padding: "4px 14px", borderRadius: 20, fontSize: 14, fontWeight: 600 }}>⌀ {overall_average.toFixed(2)} / 5</span>
                 </div>
               </div>
+
+              {/* Barres de scores */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, marginBottom: 16 }}>
                 {Object.entries(aggregated_scores).map(([name, score]) => <ScoreBar key={name} label={name} score={score} />)}
               </div>
-              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 14 }}>
+
+              {/* Graphique prix mensuel */}
+              <PriceChart individualRatings={individual_ratings} />
+
+              {/* Avis individuels */}
+              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 14, marginTop: 16 }}>
                 <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Avis individuels</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {individual_ratings.map((r) => (
@@ -1268,9 +1316,14 @@ function BakeriesView({ onShowAuth }) {
                         {(r.author_name || "A")[0].toUpperCase()}
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
                           <span style={{ fontSize: 13, fontWeight: 600, color: T.dark }}>{r.author_name}</span>
-                          <span style={{ fontSize: 12, color: T.gold, fontWeight: 600 }}>{(Object.values(r.scores).reduce((a, b) => a + b, 0) / Object.values(r.scores).length).toFixed(1)}/5</span>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            {r.price != null && (
+                              <span style={{ fontSize: 12, color: "#2C6E2C", fontWeight: 600 }}>{Number(r.price).toFixed(2)} $</span>
+                            )}
+                            <span style={{ fontSize: 12, color: T.gold, fontWeight: 600 }}>{(Object.values(r.scores).reduce((a, b) => a + b, 0) / Object.values(r.scores).length).toFixed(1)}/5</span>
+                          </div>
                         </div>
                         {r.note && <p style={{ fontSize: 13, color: T.muted, fontStyle: "italic", marginTop: 4 }}>« {r.note} »</p>}
                       </div>
@@ -1321,6 +1374,77 @@ function BakeriesView({ onShowAuth }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  PriceChart  —  graphique SVG évolution mensuelle du prix
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PriceChart({ individualRatings }) {
+  const data = (() => {
+    const byMonth = {};
+    individualRatings.forEach((r) => {
+      if (r.price == null) return;
+      const d = new Date(r.created_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (!byMonth[key]) byMonth[key] = { sum: 0, count: 0 };
+      byMonth[key].sum   += r.price;
+      byMonth[key].count += 1;
+    });
+    return Object.entries(byMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, { sum, count }]) => ({
+        label: new Date(key + "-15").toLocaleDateString("fr-CA", { month: "short", year: "2-digit" }),
+        avg:   Math.round((sum / count) * 100) / 100,
+      }));
+  })();
+
+  if (data.length < 2) return null;
+
+  const W = 460, H = 150;
+  const PL = 48, PR = 12, PT = 18, PB = 30;
+  const minY = Math.min(...data.map((d) => d.avg));
+  const maxY = Math.max(...data.map((d) => d.avg));
+  const rangeY = maxY - minY || 0.5;
+  const cx = (i) => PL + (i / (data.length - 1)) * (W - PL - PR);
+  const cy = (v) => PT + (1 - (v - minY) / rangeY) * (H - PT - PB);
+  const pathD = data.map((d, i) => `${i === 0 ? "M" : "L"}${cx(i).toFixed(1)},${cy(d.avg).toFixed(1)}`).join(" ");
+  const areaD = `${pathD} L${cx(data.length - 1).toFixed(1)},${H - PB} L${cx(0).toFixed(1)},${H - PB} Z`;
+
+  const yTicks = [minY, (minY + maxY) / 2, maxY];
+
+  return (
+    <div style={{ background: "white", border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px", marginTop: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: T.dark, marginBottom: 12 }}>Évolution du prix moyen</div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+        {/* Grille horizontale */}
+        {yTicks.map((v, i) => (
+          <line key={i} x1={PL} x2={W - PR} y1={cy(v)} y2={cy(v)} stroke={T.border} strokeWidth={0.6} />
+        ))}
+        {/* Aires */}
+        <path d={areaD} fill={`${T.gold}1A`} />
+        {/* Ligne */}
+        <path d={pathD} fill="none" stroke={T.gold} strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" />
+        {/* Points + valeurs */}
+        {data.map((d, i) => (
+          <g key={i}>
+            <circle cx={cx(i)} cy={cy(d.avg)} r={4} fill={T.gold} stroke="white" strokeWidth={1.5} />
+            <text x={cx(i)} y={cy(d.avg) - 9} textAnchor="middle" fontSize={9.5} fill={T.dark} fontWeight="600">
+              {d.avg.toFixed(2)}$
+            </text>
+          </g>
+        ))}
+        {/* Étiquettes X */}
+        {data.map((d, i) => (
+          <text key={i} x={cx(i)} y={H - 6} textAnchor="middle" fontSize={9} fill={T.muted}>{d.label}</text>
+        ))}
+        {/* Étiquettes Y */}
+        {yTicks.map((v, i) => (
+          <text key={i} x={PL - 5} y={cy(v) + 3.5} textAnchor="end" fontSize={9} fill={T.muted}>{v.toFixed(2)}$</text>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  EditRatingModal  —  modifier un avis existant
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1328,6 +1452,7 @@ function EditRatingModal({ rating, onClose, onSaved }) {
   const { user, notify } = useApp();
   const [scores, setScores] = useState({ ...rating.scores });
   const [note,   setNote]   = useState(rating.note ?? "");
+  const [price,  setPrice]  = useState(rating.price != null ? String(rating.price) : "");
   const [saving, setSaving] = useState(false);
 
   const criteria = Object.keys(rating.scores);
@@ -1336,7 +1461,8 @@ function EditRatingModal({ rating, onClose, onSaved }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const updated = await ApiClient.ratings.update(rating.id, { scores, note }, user.token);
+      const payload = { scores, note, price: price !== "" ? parseFloat(price) : null };
+      const updated = await ApiClient.ratings.update(rating.id, payload, user.token);
       notify("Avis modifié !");
       onSaved(updated);
       onClose();
@@ -1364,13 +1490,27 @@ function EditRatingModal({ rating, onClose, onSaved }) {
         </div>
       ))}
 
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
-          Commentaire <span style={{ fontStyle: "italic", textTransform: "none" }}>(optionnel)</span>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 20 }}>
+        <div style={{ flex: "0 0 130px" }}>
+          <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
+            Prix payé <span style={{ fontStyle: "italic", textTransform: "none" }}>(optionnel)</span>
+          </div>
+          <div style={{ position: "relative" }}>
+            <input type="number" min="0" step="0.25" value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="0.00"
+              style={{ ...css.input, paddingRight: 32 }} />
+            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: T.muted, pointerEvents: "none" }}>$</span>
+          </div>
         </div>
-        <textarea value={note} onChange={(e) => setNote(e.target.value)}
-          placeholder="Un mot sur votre dégustation…"
-          style={{ ...css.input, resize: "vertical", minHeight: 80 }} />
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ fontSize: 12, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
+            Commentaire <span style={{ fontStyle: "italic", textTransform: "none" }}>(optionnel)</span>
+          </div>
+          <textarea value={note} onChange={(e) => setNote(e.target.value)}
+            placeholder="Un mot sur votre dégustation…"
+            style={{ ...css.input, resize: "vertical", minHeight: 68 }} />
+        </div>
       </div>
 
       <button onClick={handleSave} disabled={saving || !allFilled}
@@ -1485,11 +1625,16 @@ function UserProfileView({ onBack, onShowFeedback }) {
                       <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 16, color: T.dark, fontWeight: 700 }}>{r.bakeries?.name ?? "—"}</div>
                       {r.bakeries?.neighborhood && <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{r.bakeries.neighborhood}</div>}
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <span style={{ background: `${T.gold}18`, border: `1px solid ${T.gold}44`, color: T.dark, padding: "4px 12px", borderRadius: 20, fontSize: 13 }}>
                         {r.product_types?.emoji} {r.product_types?.name}
                       </span>
-                      <span style={{ fontSize: 22, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>
+                      {r.price != null && (
+                        <span style={{ background: "#E8F5E9", color: "#2C6E2C", border: "1px solid #A5D6A7", padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
+                          {Number(r.price).toFixed(2)} $
+                        </span>
+                      )}
+                      <span style={{ fontSize: 20, fontWeight: 700, color: T.gold, fontFamily: '"Playfair Display", serif', lineHeight: 1 }}>
                         {scoreAvg(r.scores ?? {})}
                       </span>
                     </div>

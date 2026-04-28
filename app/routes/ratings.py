@@ -22,6 +22,8 @@ def submit_rating():
     author_name     = str(body.get("author_name", "Anonyme")).strip() or "Anonyme"
     note            = str(body.get("note", "")).strip()
     photo_url       = str(body.get("photo_url", "")).strip() or None
+    price_raw       = body.get("price")
+    price           = float(price_raw) if price_raw not in (None, "", False) else None
 
     if not bakery_id:
         return error("Le champ 'bakery_id' est requis", "MISSING_FIELD", 400)
@@ -69,6 +71,7 @@ def submit_rating():
             "author_name":     author_name,
             "note":            note,
             "photo_url":       photo_url,
+            "price":           price,
             "user_id":         g.user_id,
         })
         .execute()
@@ -118,6 +121,8 @@ def update_rating(rating_id: str):
         fields["note"] = str(body["note"]).strip()
     if "scores" in body and isinstance(body["scores"], dict):
         fields["scores"] = body["scores"]
+    if "price" in body:
+        fields["price"] = float(body["price"]) if body["price"] not in (None, "", False) else None
 
     if not fields:
         return error("Aucun champ à mettre à jour", "NO_FIELDS", 400)

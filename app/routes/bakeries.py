@@ -109,17 +109,22 @@ def get_bakery(bakery_id: str):
         all_vals = [v for v in agg.values() if v > 0]
         overall = round(sum(all_vals) / len(all_vals), 4) if all_vals else 0.0
 
+        prices = [r["price"] for r in pt_ratings if r.get("price") is not None]
+        avg_price = round(sum(prices) / len(prices), 2) if prices else None
+
         products_summary.append({
             "product_type":      {"id": pt["id"], "name": pt["name"], "emoji": pt["emoji"]},
             "aggregated_scores": agg,
             "overall_average":   overall,
             "rating_count":      len(pt_ratings),
+            "avg_price":         avg_price,
             "individual_ratings": [
                 {
                     "id":          r["id"],
                     "author_name": r["author_name"],
                     "scores":      r["scores"],
                     "note":        r["note"],
+                    "price":       r.get("price"),
                     "created_at":  r["created_at"],
                 }
                 for r in sorted(pt_ratings, key=lambda x: x["created_at"], reverse=True)

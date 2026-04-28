@@ -69,7 +69,7 @@ def login():
 @user_required
 def me():
     db     = get_db()
-    result = db.table("users").select("id, username, email, created_at").eq("id", g.user_id).maybe_single().execute()
+    result = db.table("users").select("id, username, email, role, created_at").eq("id", g.user_id).maybe_single().execute()
     if not result.data:
         return error("Utilisateur introuvable", "NOT_FOUND", 404)
     return success(result.data)
